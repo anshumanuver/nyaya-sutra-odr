@@ -18,7 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 
-interface Document {
+interface CaseDocument {
   id: string;
   file_name: string;
   file_path: string;
@@ -43,26 +43,37 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
   const { data: documents = [], isLoading, refetch } = useQuery({
     queryKey: ['case-documents', caseId, refreshTrigger],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First get the documents
+      const { data: documentsData, error: documentsError } = await supabase
         .from('case_documents')
-        .select(`
-          *,
-          profiles!case_documents_uploaded_by_fkey(first_name, last_name)
-        `)
+        .select('*')
         .eq('case_id', caseId)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching documents:', error);
-        throw error;
+      if (documentsError) {
+        console.error('Error fetching documents:', documentsError);
+        throw documentsError;
       }
 
-      return data.map(doc => ({
-        ...doc,
-        uploader_name: doc.profiles 
-          ? `${doc.profiles.first_name} ${doc.profiles.last_name}`.trim()
-          : 'Unknown User'
-      })) as Document[];
+      // Then get uploader names for each document
+      const documentsWithNames = await Promise.all(
+        documentsData.map(async (doc) => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('first_name, last_name')
+            .eq('id', doc.uploaded_by)
+            .single();
+
+          return {
+            ...doc,
+            uploader_name: profile 
+              ? `${profile.first_name} ${profile.last_name}`.trim()
+              : 'Unknown User'
+          };
+        })
+      );
+
+      return documentsWithNames as CaseDocument[];
     },
     enabled: !!caseId,
   });
@@ -83,7 +94,7 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
     });
   };
 
-  const handleDownload = async (document: Document) => {
+  const handleDownload = async (document: CaseDocument) => {
     try {
       const { data, error } = await supabase.storage
         .from('case-documents')
@@ -94,12 +105,12 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
       }
 
       const url = URL.createObjectURL(data);
-      const link = document.createElement('a');
+      const link = window.document.createElement('a');
       link.href = url;
       link.download = document.file_name;
-      document.body.appendChild(link);
+      window.document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      window.document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
       toast({
@@ -116,7 +127,7 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
     }
   };
 
-  const handleDelete = async (document: Document) => {
+  const handleDelete = async (document: CaseDocument) => {
     if (!user || document.uploaded_by !== user.id) {
       toast({
         title: "Unauthorized",
@@ -211,7 +222,7 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
                       <FileText className="h-4 w-4 text-gray-500" />
                       <span className="font-medium">{document.file_name}</span>
                       {document.is_confidential && (
-                        <Lock className="h-4 w-4 text-red-500" title="Confidential" />
+                        <Lock className="h-4 w-4 text-red-500" />
                       )}
                     </div>
                     
