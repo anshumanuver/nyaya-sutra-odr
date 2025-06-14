@@ -13,6 +13,7 @@ import MediatorDashboard from "./components/dashboard/MediatorDashboard";
 import AdminDashboard from "./components/dashboard/AdminDashboard";
 import AuthPage from "./pages/AuthPage";
 import NewCasePage from "./pages/NewCasePage";
+import JoinCasePage from "./pages/JoinCasePage";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/join-case" element={<JoinCasePage />} />
             <Route path="/case/new" element={
               <ProtectedRoute>
                 <NewCasePage />

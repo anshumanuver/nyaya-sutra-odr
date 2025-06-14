@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -27,6 +26,13 @@ const caseFormSchema = z.object({
 });
 
 type CaseFormValues = z.infer<typeof caseFormSchema>;
+
+// Function to generate a unique case code
+const generateCaseCode = () => {
+  const year = new Date().getFullYear();
+  const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `CASE${year}${randomPart}`;
+};
 
 const NewCasePage = () => {
   const navigate = useNavigate();
@@ -59,6 +65,31 @@ const NewCasePage = () => {
       const amountInDispute = values.amount_in_dispute ? 
         parseFloat(values.amount_in_dispute.replace(/[^\d.]/g, '')) : null;
 
+      // Generate a unique case code
+      let caseCode = generateCaseCode();
+      let isUnique = false;
+      let attempts = 0;
+      
+      // Ensure the case code is unique
+      while (!isUnique && attempts < 10) {
+        const { data: existingCase } = await supabase
+          .from('cases')
+          .select('id')
+          .eq('case_code', caseCode)
+          .single();
+        
+        if (!existingCase) {
+          isUnique = true;
+        } else {
+          caseCode = generateCaseCode();
+          attempts++;
+        }
+      }
+
+      if (!isUnique) {
+        throw new Error('Unable to generate unique case code. Please try again.');
+      }
+
       const caseData = {
         title: values.title,
         description: values.description,
@@ -68,6 +99,7 @@ const NewCasePage = () => {
         currency: values.currency,
         claimant_id: user.id,
         status: 'filed',
+        case_code: caseCode,
       };
 
       console.log('Creating case with data:', caseData);
@@ -85,15 +117,9 @@ const NewCasePage = () => {
 
       console.log('Case created successfully:', newCase);
 
-      // TODO: In a real implementation, you would:
-      // 1. Send an invitation email to the respondent
-      // 2. Create a respondent account if they don't exist
-      // 3. Link the respondent to the case
-      // For now, we'll just show a success message
-
       toast({
         title: "Case Filed Successfully!",
-        description: `Your case ${newCase.case_number} has been filed. The respondent will be notified via email.`,
+        description: `Your case ${newCase.case_number} has been filed with code ${caseCode}. Share this code with the respondent to join.`,
       });
 
       navigate('/dashboard/claimant');
@@ -140,7 +166,7 @@ const NewCasePage = () => {
               Case Details
             </CardTitle>
             <CardDescription>
-              Please provide comprehensive details about your dispute. All fields marked with * are required.
+              Please provide comprehensive details about your dispute. A unique case code will be generated for the respondent to join.
             </CardDescription>
           </CardHeader>
           <CardContent>
