@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -108,7 +107,7 @@ const JoinCasePage = () => {
         description: `You are now the respondent for case ${caseDetails.case_number}.`,
       });
 
-      navigate('/dashboard/claimant'); // Will redirect to appropriate dashboard based on role
+      navigate('/dashboard/respondent');
     } catch (error: any) {
       console.error('Error joining case:', error);
       toast({

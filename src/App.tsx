@@ -10,6 +10,7 @@ import NotFound from "./pages/NotFound";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import ClaimantDashboard from "./components/dashboard/ClaimantDashboard";
 import MediatorDashboard from "./components/dashboard/MediatorDashboard";
+import RespondentDashboard from "./components/dashboard/RespondentDashboard";
 import AdminDashboard from "./components/dashboard/AdminDashboard";
 import AuthPage from "./pages/AuthPage";
 import NewCasePage from "./pages/NewCasePage";
@@ -40,6 +41,7 @@ const App = () => (
               </ProtectedRoute>
             }>
               <Route path="claimant" element={<ClaimantDashboard />} />
+              <Route path="respondent" element={<RespondentDashboard />} />
               <Route path="mediator" element={<MediatorDashboard />} />
               <Route path="admin" element={<AdminDashboard />} />
             </Route>
