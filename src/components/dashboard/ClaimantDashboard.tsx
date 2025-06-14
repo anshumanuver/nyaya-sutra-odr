@@ -133,6 +133,32 @@ const ClaimantDashboard = () => {
   const resolvedCases = cases.filter(c => ['completed', 'closed'].includes(c.status));
   const casesAwaitingRespondent = cases.filter(c => !c.respondent_id);
 
+  // Function to handle viewing case details
+  const viewCaseDetails = (caseItem: Case) => {
+    toast({
+      title: "Case Details",
+      description: `Viewing details for ${caseItem.case_number}`,
+    });
+    // TODO: Navigate to case details page when implemented
+  };
+
+  // Function to handle messages
+  const openMessages = (caseItem: Case) => {
+    toast({
+      title: "Messages",
+      description: `Opening messages for ${caseItem.case_number}`,
+    });
+    // TODO: Navigate to messages page when implemented
+  };
+
+  // Function to switch to documents tab and select case
+  const viewCaseDocuments = (caseItem: Case) => {
+    setSelectedCaseId(caseItem.id);
+    // Switch to documents tab
+    const documentsTab = document.querySelector('[value="documents"]') as HTMLElement;
+    documentsTab?.click();
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
@@ -285,26 +311,18 @@ const ClaimantDashboard = () => {
                           </div>
                           
                           <div className="flex gap-2 pt-4 border-t">
-                            <Button variant="outline" size="sm">
+                            <Button variant="outline" size="sm" onClick={() => viewCaseDetails(case_item)}>
                               <Eye className="h-4 w-4 mr-2" />
                               View Details
                             </Button>
-                            <Button variant="outline" size="sm">
+                            <Button variant="outline" size="sm" onClick={() => openMessages(case_item)}>
                               <MessageSquare className="h-4 w-4 mr-2" />
                               Messages
                             </Button>
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => {
-                                setSelectedCaseId(case_item.id);
-                                // Switch to documents tab
-                                const documentsTab = document.querySelector('[data-state="active"][value="documents"]');
-                                if (!documentsTab) {
-                                  const documentsTabTrigger = document.querySelector('[value="documents"]') as HTMLElement;
-                                  documentsTabTrigger?.click();
-                                }
-                              }}
+                              onClick={() => viewCaseDocuments(case_item)}
                             >
                               <FileText className="h-4 w-4 mr-2" />
                               Documents

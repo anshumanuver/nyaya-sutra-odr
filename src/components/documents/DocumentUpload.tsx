@@ -1,11 +1,12 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, X, FileText, Loader2 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Upload, FileText, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,201 +17,213 @@ interface DocumentUploadProps {
 }
 
 const DocumentUpload = ({ caseId, onUploadComplete }: DocumentUploadProps) => {
-  const [files, setFiles] = useState<FileList | null>(null);
-  const [documentType, setDocumentType] = useState<string>('');
-  const [isConfidential, setIsConfidential] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const { toast } = useToast();
   const { user } = useAuth();
+  const { toast } = useToast();
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [documentType, setDocumentType] = useState('');
+  const [description, setDescription] = useState('');
 
-  const documentTypes = [
-    'evidence',
-    'contract',
-    'correspondence',
-    'legal_document',
-    'invoice',
-    'receipt',
-    'witness_statement',
-    'expert_report',
-    'other'
+  const allowedFileTypes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'text/plain'
   ];
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setFiles(event.target.files);
-  };
+  const maxFileSize = 10 * 1024 * 1024; // 10MB
 
-  const handleUpload = async () => {
-    if (!files || files.length === 0 || !documentType || !user) {
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!allowedFileTypes.includes(file.type)) {
       toast({
-        title: "Missing Information",
-        description: "Please select files and document type.",
-        variant: "destructive"
+        title: "Invalid File Type",
+        description: "Please upload PDF, Word documents, images, or text files only.",
+        variant: "destructive",
       });
       return;
     }
 
-    setUploading(true);
+    // Validate file size
+    if (file.size > maxFileSize) {
+      toast({
+        title: "File Too Large",
+        description: "Please upload files smaller than 10MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSelectedFile(file);
+    console.log('Selected file:', file.name, file.type, file.size);
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile || !documentType || !user) {
+      toast({
+        title: "Missing Information",
+        description: "Please select a file and document type.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
 
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${caseId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      // Create unique filename with timestamp
+      const timestamp = new Date().getTime();
+      const fileExtension = selectedFile.name.split('.').pop();
+      const fileName = `${caseId}/${timestamp}_${selectedFile.name}`;
 
-        // Upload file to storage
-        const { error: uploadError } = await supabase.storage
-          .from('case-documents')
-          .upload(fileName, file);
+      console.log('Uploading file:', fileName);
 
-        if (uploadError) {
-          throw uploadError;
-        }
+      // Upload file to Supabase storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('case-documents')
+        .upload(fileName, selectedFile, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
-        // Create document record
-        const { error: dbError } = await supabase
-          .from('case_documents')
-          .insert({
-            case_id: caseId,
-            file_name: file.name,
-            file_path: fileName,
-            file_type: file.type,
-            file_size: file.size,
-            document_type: documentType,
-            is_confidential: isConfidential,
-            uploaded_by: user.id
-          });
-
-        if (dbError) {
-          throw dbError;
-        }
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        throw uploadError;
       }
 
+      console.log('File uploaded to storage:', uploadData);
+
+      // Insert document record in database
+      const { error: dbError } = await supabase
+        .from('case_documents')
+        .insert({
+          case_id: caseId,
+          file_name: selectedFile.name,
+          file_path: fileName,
+          file_type: selectedFile.type,
+          file_size: selectedFile.size,
+          document_type: documentType,
+          uploaded_by: user.id,
+          is_confidential: false
+        });
+
+      if (dbError) {
+        console.error('Database insert error:', dbError);
+        // If database insert fails, cleanup the uploaded file
+        await supabase.storage.from('case-documents').remove([fileName]);
+        throw dbError;
+      }
+
+      console.log('Document record created in database');
+
       toast({
-        title: "Upload Successful",
-        description: `${files.length} document(s) uploaded successfully.`
+        title: "Document Uploaded",
+        description: `${selectedFile.name} has been uploaded successfully.`,
       });
 
-      setFiles(null);
+      // Reset form
+      setSelectedFile(null);
       setDocumentType('');
-      setIsConfidential(false);
+      setDescription('');
+      
+      // Clear file input
+      const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+
       onUploadComplete();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload error:', error);
       toast({
         title: "Upload Failed",
-        description: "Failed to upload documents. Please try again.",
-        variant: "destructive"
+        description: error.message || "Failed to upload document. Please try again.",
+        variant: "destructive",
       });
     } finally {
-      setUploading(false);
-    }
-  };
-
-  const removeFile = (index: number) => {
-    if (files) {
-      const dt = new DataTransfer();
-      for (let i = 0; i < files.length; i++) {
-        if (i !== index) {
-          dt.items.add(files[i]);
-        }
-      }
-      setFiles(dt.files);
+      setIsUploading(false);
     }
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center">
-          <Upload className="h-5 w-5 mr-2" />
-          Upload Documents
+        <CardTitle className="flex items-center gap-2">
+          <Upload className="h-5 w-5" />
+          Upload Document
         </CardTitle>
+        <CardDescription>
+          Upload supporting documents for this case. Maximum file size: 10MB.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <Label htmlFor="file-upload">Select Files</Label>
+          <Label htmlFor="file-upload">Select File</Label>
           <Input
             id="file-upload"
             type="file"
-            multiple
             onChange={handleFileSelect}
+            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.txt"
             className="mt-1"
-            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
           />
-          <p className="text-sm text-gray-500 mt-1">
-            Supported formats: PDF, DOC, DOCX, JPG, PNG, TXT
-          </p>
+          {selectedFile && (
+            <div className="mt-2 p-2 bg-gray-50 rounded-md">
+              <div className="flex items-center gap-2 text-sm">
+                <FileText className="h-4 w-4" />
+                <span>{selectedFile.name}</span>
+                <span className="text-gray-500">({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)</span>
+              </div>
+            </div>
+          )}
         </div>
 
-        {files && files.length > 0 && (
-          <div className="space-y-2">
-            <Label>Selected Files:</Label>
-            {Array.from(files).map((file, index) => (
-              <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                <div className="flex items-center">
-                  <FileText className="h-4 w-4 mr-2" />
-                  <span className="text-sm">{file.name}</span>
-                  <span className="text-xs text-gray-500 ml-2">
-                    ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                  </span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeFile(index)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-
         <div>
-          <Label>Document Type</Label>
+          <Label htmlFor="document-type">Document Type</Label>
           <Select value={documentType} onValueChange={setDocumentType}>
             <SelectTrigger className="mt-1">
               <SelectValue placeholder="Select document type" />
             </SelectTrigger>
             <SelectContent>
-              {documentTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                </SelectItem>
-              ))}
+              <SelectItem value="evidence">Evidence</SelectItem>
+              <SelectItem value="contract">Contract</SelectItem>
+              <SelectItem value="correspondence">Correspondence</SelectItem>
+              <SelectItem value="receipt">Receipt/Invoice</SelectItem>
+              <SelectItem value="legal_notice">Legal Notice</SelectItem>
+              <SelectItem value="statement">Statement</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        <div className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            id="confidential"
-            checked={isConfidential}
-            onChange={(e) => setIsConfidential(e.target.checked)}
-            className="rounded"
+        <div>
+          <Label htmlFor="description">Description (Optional)</Label>
+          <Textarea
+            id="description"
+            placeholder="Brief description of the document"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="mt-1"
+            rows={3}
           />
-          <Label htmlFor="confidential" className="text-sm">
-            Mark as confidential (restricted access)
-          </Label>
         </div>
 
-        <Button
+        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+          <div className="flex items-center gap-2 text-yellow-800 text-sm">
+            <AlertCircle className="h-4 w-4" />
+            <span>Supported formats: PDF, Word documents, images (JPG, PNG, GIF), and text files</span>
+          </div>
+        </div>
+
+        <Button 
           onClick={handleUpload}
-          disabled={!files || files.length === 0 || !documentType || uploading}
+          disabled={!selectedFile || !documentType || isUploading}
           className="w-full"
         >
-          {uploading ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Uploading...
-            </>
-          ) : (
-            <>
-              <Upload className="h-4 w-4 mr-2" />
-              Upload Documents
-            </>
-          )}
+          {isUploading ? 'Uploading...' : 'Upload Document'}
         </Button>
       </CardContent>
     </Card>

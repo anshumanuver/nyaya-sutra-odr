@@ -1,6 +1,7 @@
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -8,41 +9,44 @@ import {
   Download, 
   Eye, 
   Trash2, 
-  Lock, 
-  User,
   Calendar,
-  HardDrive
+  User,
+  FileIcon,
+  ImageIcon,
+  FileTextIcon
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 
-interface CaseDocument {
+interface DocumentListProps {
+  caseId: string;
+  refreshTrigger: number;
+}
+
+interface Document {
   id: string;
   file_name: string;
   file_path: string;
-  file_type: string | null;
-  file_size: number | null;
+  file_type: string;
+  file_size: number;
   document_type: string;
-  is_confidential: boolean | null;
   uploaded_by: string;
+  is_confidential: boolean;
   created_at: string;
   uploader_name?: string;
-}
-
-interface DocumentListProps {
-  caseId: string;
-  refreshTrigger?: number;
 }
 
 const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const { data: documents = [], isLoading, refetch } = useQuery({
     queryKey: ['case-documents', caseId, refreshTrigger],
     queryFn: async () => {
+      console.log('Fetching documents for case:', caseId);
+
       // First get the documents
       const { data: documentsData, error: documentsError } = await supabase
         .from('case_documents')
@@ -55,33 +59,50 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
         throw documentsError;
       }
 
-      // Then get uploader names for each document
-      const documentsWithNames = await Promise.all(
-        documentsData.map(async (doc) => {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('first_name, last_name')
-            .eq('id', doc.uploaded_by)
-            .single();
+      console.log('Documents fetched:', documentsData);
 
-          return {
-            ...doc,
-            uploader_name: profile 
-              ? `${profile.first_name} ${profile.last_name}`.trim()
-              : 'Unknown User'
-          };
-        })
-      );
+      if (!documentsData || documentsData.length === 0) {
+        return [];
+      }
 
-      return documentsWithNames as CaseDocument[];
+      // Get uploader profiles
+      const uploaderIds = [...new Set(documentsData.map(d => d.uploaded_by))];
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', uploaderIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+      }
+
+      // Combine documents with uploader information
+      return documentsData.map(doc => ({
+        ...doc,
+        uploader_name: profilesData?.find(p => p.id === doc.uploaded_by)
+          ? `${profilesData.find(p => p.id === doc.uploaded_by)?.first_name} ${profilesData.find(p => p.id === doc.uploaded_by)?.last_name}`
+          : 'Unknown User'
+      }));
     },
     enabled: !!caseId,
   });
 
-  const formatFileSize = (bytes: number | null) => {
-    if (!bytes) return 'Unknown';
-    const mb = bytes / 1024 / 1024;
-    return `${mb.toFixed(2)} MB`;
+  const getFileIcon = (fileType: string) => {
+    if (fileType.startsWith('image/')) {
+      return <ImageIcon className="h-5 w-5 text-blue-600" />;
+    } else if (fileType.includes('pdf')) {
+      return <FileTextIcon className="h-5 w-5 text-red-600" />;
+    } else {
+      return <FileIcon className="h-5 w-5 text-gray-600" />;
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   const formatDate = (dateString: string) => {
@@ -94,105 +115,105 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
     });
   };
 
-  const handleDownload = async (document: CaseDocument) => {
+  const downloadDocument = async (document: Document) => {
     try {
+      console.log('Downloading document:', document.file_path);
+
       const { data, error } = await supabase.storage
         .from('case-documents')
         .download(document.file_path);
 
       if (error) {
+        console.error('Download error:', error);
         throw error;
       }
 
+      // Create download link
       const url = URL.createObjectURL(data);
-      const link = window.document.createElement('a');
-      link.href = url;
-      link.download = document.file_name;
-      window.document.body.appendChild(link);
-      link.click();
-      window.document.body.removeChild(link);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = document.file_name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
       URL.revokeObjectURL(url);
 
       toast({
         title: "Download Started",
-        description: `Downloading ${document.file_name}`
+        description: `Downloading ${document.file_name}`,
       });
-    } catch (error) {
-      console.error('Download error:', error);
+    } catch (error: any) {
+      console.error('Error downloading document:', error);
       toast({
         title: "Download Failed",
-        description: "Failed to download document. Please try again.",
-        variant: "destructive"
+        description: error.message || "Failed to download document.",
+        variant: "destructive",
       });
     }
   };
 
-  const handleDelete = async (document: CaseDocument) => {
+  const deleteDocument = async (document: Document) => {
     if (!user || document.uploaded_by !== user.id) {
       toast({
-        title: "Unauthorized",
+        title: "Permission Denied",
         description: "You can only delete documents you uploaded.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
+    setDeletingId(document.id);
+
     try {
-      // Delete from storage
-      const { error: storageError } = await supabase.storage
-        .from('case-documents')
-        .remove([document.file_path]);
+      console.log('Deleting document:', document.id);
 
-      if (storageError) {
-        throw storageError;
-      }
-
-      // Delete from database
+      // Delete from database first
       const { error: dbError } = await supabase
         .from('case_documents')
         .delete()
         .eq('id', document.id);
 
       if (dbError) {
+        console.error('Database delete error:', dbError);
         throw dbError;
+      }
+
+      // Delete from storage
+      const { error: storageError } = await supabase.storage
+        .from('case-documents')
+        .remove([document.file_path]);
+
+      if (storageError) {
+        console.error('Storage delete error:', storageError);
+        // Don't throw here as the db record is already deleted
       }
 
       toast({
         title: "Document Deleted",
-        description: `${document.file_name} has been deleted successfully.`
+        description: `${document.file_name} has been deleted.`,
       });
 
       refetch();
-    } catch (error) {
-      console.error('Delete error:', error);
+    } catch (error: any) {
+      console.error('Error deleting document:', error);
       toast({
         title: "Delete Failed",
-        description: "Failed to delete document. Please try again.",
-        variant: "destructive"
+        description: error.message || "Failed to delete document.",
+        variant: "destructive",
       });
+    } finally {
+      setDeletingId(null);
     }
-  };
-
-  const getDocumentTypeColor = (type: string) => {
-    const colors: Record<string, string> = {
-      evidence: 'bg-blue-100 text-blue-800',
-      contract: 'bg-green-100 text-green-800',
-      correspondence: 'bg-yellow-100 text-yellow-800',
-      legal_document: 'bg-purple-100 text-purple-800',
-      invoice: 'bg-orange-100 text-orange-800',
-      receipt: 'bg-pink-100 text-pink-800',
-      witness_statement: 'bg-indigo-100 text-indigo-800',
-      expert_report: 'bg-teal-100 text-teal-800',
-      other: 'bg-gray-100 text-gray-800'
-    };
-    return colors[type] || colors.other;
   };
 
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="p-6">
-          <div className="text-center">Loading documents...</div>
+        <CardContent className="py-8">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="ml-2">Loading documents...</span>
+          </div>
         </CardContent>
       </Card>
     );
@@ -201,55 +222,51 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center">
-          <FileText className="h-5 w-5 mr-2" />
-          Case Documents ({documents.length})
+        <CardTitle className="flex items-center gap-2">
+          <FileText className="h-5 w-5" />
+          Case Documents
         </CardTitle>
+        <CardDescription>
+          {documents.length} document{documents.length !== 1 ? 's' : ''} uploaded
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {documents.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-            <p>No documents uploaded yet</p>
+          <div className="text-center py-8">
+            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Documents Yet</h3>
+            <p className="text-gray-600">Upload documents using the "Upload New" tab</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {documents.map((document) => (
-              <div key={document.id} className="border rounded-lg p-4 hover:bg-gray-50">
+              <div key={document.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <FileText className="h-4 w-4 text-gray-500" />
-                      <span className="font-medium">{document.file_name}</span>
-                      {document.is_confidential && (
-                        <Lock className="h-4 w-4 text-red-500" />
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
-                      <Badge className={getDocumentTypeColor(document.document_type)}>
-                        {document.document_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </Badge>
-                      <div className="flex items-center gap-1">
-                        <HardDrive className="h-3 w-3" />
-                        {formatFileSize(document.file_size)}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <User className="h-3 w-3" />
-                        {document.uploader_name}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {formatDate(document.created_at)}
+                  <div className="flex items-start gap-3 flex-1">
+                    {getFileIcon(document.file_type)}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-gray-900 truncate">{document.file_name}</h4>
+                      <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
+                        <Badge variant="outline" className="capitalize">
+                          {document.document_type.replace('_', ' ')}
+                        </Badge>
+                        <span className="flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          {document.uploader_name}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {formatDate(document.created_at)}
+                        </span>
+                        <span>{formatFileSize(document.file_size)}</span>
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2 ml-4">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDownload(document)}
+                      onClick={() => downloadDocument(document)}
                     >
                       <Download className="h-4 w-4" />
                     </Button>
@@ -257,10 +274,15 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleDelete(document)}
+                        onClick={() => deleteDocument(document)}
+                        disabled={deletingId === document.id}
                         className="text-red-600 hover:text-red-700"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        {deletingId === document.id ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
                       </Button>
                     )}
                   </div>

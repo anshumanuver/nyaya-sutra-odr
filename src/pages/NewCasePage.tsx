@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { ArrowLeft, FileText, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -15,16 +16,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { generateCaseCode } from '@/utils/caseUtils';
 
-const newCaseSchema = z.object({
-  title: z.string().min(5, 'Title must be at least 5 characters').max(200, 'Title is too long'),
+const caseSchema = z.object({
+  title: z.string().min(5, 'Title must be at least 5 characters'),
   description: z.string().min(20, 'Description must be at least 20 characters'),
-  case_type: z.enum(['civil', 'consumer', 'property', 'commercial', 'family', 'employment']),
-  dispute_mode: z.enum(['mediation', 'arbitration']),
-  amount_in_dispute: z.string().optional(),
-  currency: z.enum(['INR', 'USD', 'EUR']).default('INR'),
+  case_type: z.string().min(1, 'Please select a case type'),
+  dispute_mode: z.string().min(1, 'Please select a dispute resolution mode'),
+  amount_in_dispute: z.number().min(1, 'Amount must be greater than 0').optional(),
+  currency: z.string().optional(),
 });
 
-type NewCaseValues = z.infer<typeof newCaseSchema>;
+type CaseFormValues = z.infer<typeof caseSchema>;
 
 const NewCasePage = () => {
   const navigate = useNavigate();
@@ -32,18 +33,18 @@ const NewCasePage = () => {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const form = useForm<NewCaseValues>({
-    resolver: zodResolver(newCaseSchema),
+  const form = useForm<CaseFormValues>({
+    resolver: zodResolver(caseSchema),
     defaultValues: {
       currency: 'INR',
     },
   });
 
-  const onSubmit = async (values: NewCaseValues) => {
+  const onSubmit = async (values: CaseFormValues) => {
     if (!user) {
       toast({
         title: "Authentication Error",
-        description: "You must be logged in to create a case.",
+        description: "You must be logged in to file a case.",
         variant: "destructive",
       });
       return;
@@ -52,24 +53,26 @@ const NewCasePage = () => {
     setIsSubmitting(true);
 
     try {
+      // Generate a unique case code
       const caseCode = generateCaseCode();
-      const amount = values.amount_in_dispute ? parseFloat(values.amount_in_dispute) : null;
+
+      const caseData = {
+        title: values.title,
+        description: values.description,
+        case_type: values.case_type,
+        dispute_mode: values.dispute_mode,
+        amount_in_dispute: values.amount_in_dispute || null,
+        currency: values.currency || 'INR',
+        claimant_id: user.id,
+        case_code: caseCode,
+        status: 'filed'
+      };
+
+      console.log('Submitting case data:', caseData);
 
       const { data, error } = await supabase
         .from('cases')
-        .insert([
-          {
-            title: values.title,
-            description: values.description,
-            case_type: values.case_type,
-            dispute_mode: values.dispute_mode,
-            amount_in_dispute: amount,
-            currency: values.currency,
-            claimant_id: user.id,
-            status: 'filed',
-            case_code: caseCode,
-          },
-        ])
+        .insert(caseData)
         .select()
         .single();
 
@@ -78,16 +81,18 @@ const NewCasePage = () => {
         throw error;
       }
 
+      console.log('Case created successfully:', data);
+
       toast({
-        title: "Case Created Successfully!",
-        description: `Your case has been filed with case number: ${data.case_number}`,
+        title: "Case Filed Successfully!",
+        description: `Your case has been filed with case number ${data.case_number}. Case code: ${caseCode}`,
       });
 
       navigate('/dashboard/claimant');
     } catch (error: any) {
-      console.error('Error creating case:', error);
+      console.error('Error filing case:', error);
       toast({
-        title: "Error Creating Case",
+        title: "Error Filing Case",
         description: error.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
@@ -98,22 +103,31 @@ const NewCasePage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
         <div className="mb-8">
-          <Button variant="ghost" onClick={() => navigate('/dashboard/claimant')} className="mb-4">
-            ← Back to Dashboard
+          <Button 
+            variant="ghost" 
+            onClick={() => navigate('/dashboard/claimant')}
+            className="mb-4"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
           </Button>
           <div className="text-center">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">File a New Case</h1>
-            <p className="text-gray-600">Start your dispute resolution process</p>
+            <p className="text-gray-600">Submit your dispute for online resolution</p>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Case Details</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Case Information
+            </CardTitle>
             <CardDescription>
-              Provide details about your dispute to initiate the resolution process
+              Provide detailed information about your dispute to begin the resolution process
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -126,7 +140,10 @@ const NewCasePage = () => {
                     <FormItem>
                       <FormLabel>Case Title</FormLabel>
                       <FormControl>
-                        <Input placeholder="Brief description of your dispute" {...field} />
+                        <Input 
+                          placeholder="Brief description of your dispute" 
+                          {...field} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -140,10 +157,10 @@ const NewCasePage = () => {
                     <FormItem>
                       <FormLabel>Detailed Description</FormLabel>
                       <FormControl>
-                        <Textarea
-                          placeholder="Provide a detailed explanation of the dispute, including relevant facts and timeline"
+                        <Textarea 
+                          placeholder="Explain your dispute in detail, including relevant facts and circumstances"
                           className="min-h-[120px]"
-                          {...field}
+                          {...field} 
                         />
                       </FormControl>
                       <FormMessage />
@@ -165,12 +182,12 @@ const NewCasePage = () => {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="civil">Civil</SelectItem>
-                            <SelectItem value="consumer">Consumer</SelectItem>
-                            <SelectItem value="property">Property</SelectItem>
-                            <SelectItem value="commercial">Commercial</SelectItem>
-                            <SelectItem value="family">Family</SelectItem>
-                            <SelectItem value="employment">Employment</SelectItem>
+                            <SelectItem value="commercial">Commercial Dispute</SelectItem>
+                            <SelectItem value="consumer">Consumer Complaint</SelectItem>
+                            <SelectItem value="employment">Employment Dispute</SelectItem>
+                            <SelectItem value="property">Property Dispute</SelectItem>
+                            <SelectItem value="family">Family Dispute</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -183,16 +200,17 @@ const NewCasePage = () => {
                     name="dispute_mode"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Preferred Resolution Mode</FormLabel>
+                        <FormLabel>Preferred Resolution Method</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select resolution mode" />
+                              <SelectValue placeholder="Select resolution method" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="mediation">Mediation</SelectItem>
                             <SelectItem value="arbitration">Arbitration</SelectItem>
+                            <SelectItem value="conciliation">Conciliation</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -201,26 +219,25 @@ const NewCasePage = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="md:col-span-2">
-                    <FormField
-                      control={form.control}
-                      name="amount_in_dispute"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Amount in Dispute (Optional)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              placeholder="0.00"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="amount_in_dispute"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Amount in Dispute (Optional)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            placeholder="Enter amount"
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <FormField
                     control={form.control}
@@ -231,7 +248,7 @@ const NewCasePage = () => {
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue />
+                              <SelectValue placeholder="Select currency" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -246,13 +263,21 @@ const NewCasePage = () => {
                   />
                 </div>
 
-                <div className="pt-6 border-t">
+                <div className="flex gap-4 pt-6">
                   <Button 
                     type="submit" 
                     disabled={isSubmitting}
-                    className="w-full"
+                    className="flex-1"
                   >
-                    {isSubmitting ? 'Creating Case...' : 'File Case'}
+                    {isSubmitting ? 'Filing Case...' : 'File Case'}
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={() => navigate('/dashboard/claimant')}
+                    className="flex-1"
+                  >
+                    Cancel
                   </Button>
                 </div>
               </form>
