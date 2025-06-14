@@ -9,12 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Scale, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 interface RegisterFormProps {
   onBack: () => void;
+  onToggleMode: () => void;
 }
 
-const RegisterForm = ({ onBack }: RegisterFormProps) => {
+const RegisterForm = ({ onBack, onToggleMode }: RegisterFormProps) => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -30,6 +32,7 @@ const RegisterForm = ({ onBack }: RegisterFormProps) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signUp } = useAuth();
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -37,6 +40,7 @@ const RegisterForm = ({ onBack }: RegisterFormProps) => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (formData.password !== formData.confirmPassword) {
       toast({
         title: "Password Mismatch",
@@ -57,29 +61,40 @@ const RegisterForm = ({ onBack }: RegisterFormProps) => {
 
     setLoading(true);
     
-    // Simulate registration process
-    setTimeout(() => {
-      toast({
-        title: "Registration Successful",
-        description: "Your account has been created successfully!",
-      });
+    try {
+      const userData = {
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        phone: formData.phone,
+        role: formData.role,
+        organization: formData.organization,
+        bar_number: formData.barNumber
+      };
+
+      const { error } = await signUp(formData.email, formData.password, userData);
       
-      // Redirect based on role
-      switch(formData.role) {
-        case 'claimant':
-          navigate('/dashboard/claimant');
-          break;
-        case 'respondent':
-          navigate('/dashboard/respondent');
-          break;
-        case 'mediator':
-          navigate('/dashboard/mediator');
-          break;
-        default:
-          navigate('/dashboard');
+      if (error) {
+        toast({
+          title: "Registration Failed",
+          description: error.message,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Registration Successful",
+          description: "Please check your email to verify your account!",
+        });
+        navigate('/dashboard/claimant');
       }
+    } catch (error) {
+      toast({
+        title: "Registration Failed",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
       setLoading(false);
-    }, 2000);
+    }
   };
 
   return (
@@ -226,6 +241,11 @@ const RegisterForm = ({ onBack }: RegisterFormProps) => {
               {loading ? 'Creating Account...' : 'Create Account'}
             </Button>
           </form>
+          <div className="mt-4 text-center">
+            <Button variant="link" onClick={onToggleMode}>
+              Already have an account? Sign in here
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

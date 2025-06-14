@@ -9,7 +9,240 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      case_documents: {
+        Row: {
+          case_id: string
+          created_at: string | null
+          document_type: string
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+          is_confidential: boolean | null
+          uploaded_by: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string | null
+          document_type: string
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          is_confidential?: boolean | null
+          uploaded_by: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string | null
+          document_type?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          is_confidential?: boolean | null
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_documents_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_messages: {
+        Row: {
+          case_id: string
+          content: string
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          message_type: string
+          recipient_ids: string[] | null
+          sender_id: string
+        }
+        Insert: {
+          case_id: string
+          content: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message_type: string
+          recipient_ids?: string[] | null
+          sender_id: string
+        }
+        Update: {
+          case_id?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message_type?: string
+          recipient_ids?: string[] | null
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_messages_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_sessions: {
+        Row: {
+          case_id: string
+          created_at: string | null
+          duration_minutes: number | null
+          id: string
+          location: string | null
+          meeting_link: string | null
+          notes: string | null
+          scheduled_at: string
+          session_type: string
+          status: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string | null
+          duration_minutes?: number | null
+          id?: string
+          location?: string | null
+          meeting_link?: string | null
+          notes?: string | null
+          scheduled_at: string
+          session_type: string
+          status?: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string | null
+          duration_minutes?: number | null
+          id?: string
+          location?: string | null
+          meeting_link?: string | null
+          notes?: string | null
+          scheduled_at?: string
+          session_type?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_sessions_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cases: {
+        Row: {
+          amount_in_dispute: number | null
+          case_number: string
+          case_type: string
+          claimant_id: string
+          created_at: string | null
+          currency: string | null
+          description: string
+          dispute_mode: string
+          id: string
+          mediator_id: string | null
+          resolution_type: string | null
+          resolved_at: string | null
+          respondent_id: string | null
+          status: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount_in_dispute?: number | null
+          case_number?: string
+          case_type: string
+          claimant_id: string
+          created_at?: string | null
+          currency?: string | null
+          description: string
+          dispute_mode: string
+          id?: string
+          mediator_id?: string | null
+          resolution_type?: string | null
+          resolved_at?: string | null
+          respondent_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount_in_dispute?: number | null
+          case_number?: string
+          case_type?: string
+          claimant_id?: string
+          created_at?: string | null
+          currency?: string | null
+          description?: string
+          dispute_mode?: string
+          id?: string
+          mediator_id?: string | null
+          resolution_type?: string | null
+          resolved_at?: string | null
+          respondent_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          bar_number: string | null
+          created_at: string | null
+          email: string
+          first_name: string
+          id: string
+          is_verified: boolean | null
+          last_name: string
+          organization: string | null
+          phone: string | null
+          role: string
+          updated_at: string | null
+        }
+        Insert: {
+          bar_number?: string | null
+          created_at?: string | null
+          email: string
+          first_name: string
+          id: string
+          is_verified?: boolean | null
+          last_name: string
+          organization?: string | null
+          phone?: string | null
+          role: string
+          updated_at?: string | null
+        }
+        Update: {
+          bar_number?: string | null
+          created_at?: string | null
+          email?: string
+          first_name?: string
+          id?: string
+          is_verified?: boolean | null
+          last_name?: string
+          organization?: string | null
+          phone?: string | null
+          role?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

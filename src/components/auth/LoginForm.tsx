@@ -5,52 +5,52 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Scale, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 interface LoginFormProps {
   onBack: () => void;
+  onToggleMode: () => void;
 }
 
-const LoginForm = ({ onBack }: LoginFormProps) => {
+const LoginForm = ({ onBack, onToggleMode }: LoginFormProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signIn } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
-    // Simulate login process
-    setTimeout(() => {
-      toast({
-        title: "Login Successful",
-        description: `Welcome back! Redirecting to ${role} dashboard...`,
-      });
+    try {
+      const { error } = await signIn(email, password);
       
-      // Redirect based on role
-      switch(role) {
-        case 'claimant':
-          navigate('/dashboard/claimant');
-          break;
-        case 'respondent':
-          navigate('/dashboard/respondent');
-          break;
-        case 'mediator':
-          navigate('/dashboard/mediator');
-          break;
-        case 'admin':
-          navigate('/dashboard/admin');
-          break;
-        default:
-          navigate('/dashboard');
+      if (error) {
+        toast({
+          title: "Login Failed",
+          description: error.message,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Login Successful",
+          description: "Welcome back! Redirecting to dashboard...",
+        });
+        navigate('/dashboard/claimant');
       }
+    } catch (error) {
+      toast({
+        title: "Login Failed",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -94,26 +94,12 @@ const LoginForm = ({ onBack }: LoginFormProps) => {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
-              <Select value={role} onValueChange={setRole} required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select your role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="claimant">Claimant</SelectItem>
-                  <SelectItem value="respondent">Respondent</SelectItem>
-                  <SelectItem value="mediator">Mediator/Arbitrator</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Signing In...' : 'Sign In'}
             </Button>
           </form>
           <div className="mt-4 text-center">
-            <Button variant="link" onClick={onBack}>
+            <Button variant="link" onClick={onToggleMode}>
               Don't have an account? Register here
             </Button>
           </div>

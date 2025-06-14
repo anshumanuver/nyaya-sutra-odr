@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -25,11 +24,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
 
   // Determine user role from URL
   const userRole = location.pathname.split('/')[2] || 'user';
@@ -57,8 +60,21 @@ const DashboardLayout = () => {
 
   const currentNav = navigationItems[userRole as keyof typeof navigationItems] || navigationItems.claimant;
 
-  const handleLogout = () => {
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Logged Out",
+        description: "You have been successfully logged out.",
+      });
+      navigate('/');
+    } catch (error) {
+      toast({
+        title: "Logout Failed",
+        description: "There was an error logging you out. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -142,7 +158,7 @@ const DashboardLayout = () => {
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
                       <AvatarFallback className="bg-blue-600 text-white">
-                        {userRole[0].toUpperCase()}
+                        {user?.email?.[0]?.toUpperCase() || 'U'}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
@@ -151,12 +167,10 @@ const DashboardLayout = () => {
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">
-                        {userRole === 'claimant' && 'John Doe'}
-                        {userRole === 'mediator' && 'Adv. Priya Sharma'}
-                        {userRole === 'admin' && 'Admin User'}
+                        {user?.email || 'User'}
                       </p>
                       <p className="text-xs leading-none text-muted-foreground">
-                        {userRole}@lexodr.com
+                        {userRole}
                       </p>
                     </div>
                   </DropdownMenuLabel>
