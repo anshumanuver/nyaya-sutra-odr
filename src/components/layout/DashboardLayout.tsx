@@ -13,7 +13,8 @@ import {
   LogOut,
   Menu,
   X,
-  Bell
+  Bell,
+  UserPlus
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -37,12 +38,14 @@ const DashboardLayout = () => {
   // Determine user role from URL
   const userRole = location.pathname.split('/')[2] || 'user';
 
+  // Updated navigation items to include "Join Case"
   const navigationItems = {
     claimant: [
       { icon: Home, label: 'Dashboard', path: '/dashboard/claimant' },
       { icon: FileText, label: 'My Cases', path: '/dashboard/claimant/cases' },
       { icon: Calendar, label: 'Sessions', path: '/dashboard/claimant/sessions' },
       { icon: MessageSquare, label: 'Messages', path: '/dashboard/claimant/messages' },
+      { icon: UserPlus, label: 'Join Case', path: '/join-case' }, // Added for claimant
     ],
     mediator: [
       { icon: Home, label: 'Dashboard', path: '/dashboard/mediator' },
@@ -50,15 +53,28 @@ const DashboardLayout = () => {
       { icon: Calendar, label: 'Calendar', path: '/dashboard/mediator/calendar' },
       { icon: Users, label: 'Parties', path: '/dashboard/mediator/parties' },
     ],
+    respondent: [
+      { icon: Home, label: 'Dashboard', path: '/dashboard/respondent' },
+      { icon: FileText, label: 'My Cases', path: '/dashboard/respondent/cases' },
+      { icon: Calendar, label: 'Sessions', path: '/dashboard/respondent/sessions' },
+      { icon: MessageSquare, label: 'Messages', path: '/dashboard/respondent/messages' },
+      { icon: UserPlus, label: 'Join Case', path: '/join-case' }, // Added for respondent
+    ],
     admin: [
       { icon: Home, label: 'Dashboard', path: '/dashboard/admin' },
       { icon: FileText, label: 'Cases', path: '/dashboard/admin/cases' },
       { icon: Users, label: 'Neutrals', path: '/dashboard/admin/neutrals' },
       { icon: Settings, label: 'System', path: '/dashboard/admin/system' },
-    ]
+    ],
   };
 
-  const currentNav = navigationItems[userRole as keyof typeof navigationItems] || navigationItems.claimant;
+  // Determine which nav to use. Assume 'respondent' nav set if role is explicitly 'respondent'
+  const currentNav =
+    navigationItems[
+      (userRole === 'claimant' || userRole === 'mediator' || userRole === 'admin' || userRole === 'respondent'
+        ? userRole
+        : 'claimant') as keyof typeof navigationItems
+    ] || navigationItems.claimant;
 
   const handleLogout = async () => {
     try {
