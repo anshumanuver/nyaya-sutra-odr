@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { ArrowLeft, FileText, Scale } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -14,29 +13,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { generateCaseCode } from '@/utils/caseUtils';
 
-const caseFormSchema = z.object({
-  title: z.string().min(5, 'Title must be at least 5 characters'),
+const newCaseSchema = z.object({
+  title: z.string().min(5, 'Title must be at least 5 characters').max(200, 'Title is too long'),
   description: z.string().min(20, 'Description must be at least 20 characters'),
   case_type: z.enum(['civil', 'consumer', 'property', 'commercial', 'family', 'employment']),
   dispute_mode: z.enum(['mediation', 'arbitration']),
-  amount_in_dispute: z.string().optional().refine(
-    (val) => !val || !isNaN(Number(val.replace(/[^\d.]/g, ''))),
-    'Amount must be a valid number'
-  ),
-  currency: z.string().default('INR'),
-  respondent_email: z.string().email('Please enter a valid email address'),
-  respondent_name: z.string().min(2, 'Respondent name is required'),
+  amount_in_dispute: z.string().optional(),
+  currency: z.enum(['INR', 'USD', 'EUR']).default('INR'),
 });
 
-type CaseFormValues = z.infer<typeof caseFormSchema>;
-
-// Function to generate a unique case code
-const generateCaseCode = () => {
-  const year = new Date().getFullYear();
-  const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
-  return `CASE${year}${randomPart}`;
-};
+type NewCaseValues = z.infer<typeof newCaseSchema>;
 
 const NewCasePage = () => {
   const navigate = useNavigate();
@@ -44,98 +32,62 @@ const NewCasePage = () => {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const form = useForm<CaseFormValues>({
-    resolver: zodResolver(caseFormSchema),
+  const form = useForm<NewCaseValues>({
+    resolver: zodResolver(newCaseSchema),
     defaultValues: {
       currency: 'INR',
-      dispute_mode: 'mediation',
-      title: '',
-      description: '',
-      amount_in_dispute: '',
-      respondent_email: '',
-      respondent_name: '',
     },
   });
 
-  const onSubmit = async (values: CaseFormValues) => {
+  const onSubmit = async (values: NewCaseValues) => {
     if (!user) {
       toast({
         title: "Authentication Error",
-        description: "You must be logged in to file a case.",
+        description: "You must be logged in to create a case.",
         variant: "destructive",
       });
       return;
     }
 
     setIsSubmitting(true);
-    
+
     try {
-      // Convert amount to number if provided
-      const amountInDispute = values.amount_in_dispute ? 
-        parseFloat(values.amount_in_dispute.replace(/[^\d.]/g, '')) : null;
+      const caseCode = generateCaseCode();
+      const amount = values.amount_in_dispute ? parseFloat(values.amount_in_dispute) : null;
 
-      // Generate a unique case code
-      let caseCode = generateCaseCode();
-      let isUnique = false;
-      let attempts = 0;
-      
-      // Ensure the case code is unique
-      while (!isUnique && attempts < 10) {
-        const { data: existingCase } = await supabase
-          .from('cases')
-          .select('id')
-          .eq('case_code', caseCode)
-          .maybeSingle();
-        
-        if (!existingCase) {
-          isUnique = true;
-        } else {
-          caseCode = generateCaseCode();
-          attempts++;
-        }
-      }
-
-      if (!isUnique) {
-        throw new Error('Unable to generate unique case code. Please try again.');
-      }
-
-      const caseData = {
-        title: values.title,
-        description: values.description,
-        case_type: values.case_type,
-        dispute_mode: values.dispute_mode,
-        amount_in_dispute: amountInDispute,
-        currency: values.currency,
-        claimant_id: user.id,
-        status: 'filed',
-        case_code: caseCode,
-      };
-
-      console.log('Creating case with data:', caseData);
-
-      const { data: newCase, error: caseError } = await supabase
+      const { data, error } = await supabase
         .from('cases')
-        .insert([caseData])
+        .insert([
+          {
+            title: values.title,
+            description: values.description,
+            case_type: values.case_type,
+            dispute_mode: values.dispute_mode,
+            amount_in_dispute: amount,
+            currency: values.currency,
+            claimant_id: user.id,
+            status: 'filed',
+            case_code: caseCode,
+          },
+        ])
         .select()
         .single();
 
-      if (caseError) {
-        console.error('Error creating case:', caseError);
-        throw caseError;
+      if (error) {
+        console.error('Error creating case:', error);
+        throw error;
       }
 
-      console.log('Case created successfully:', newCase);
-
       toast({
-        title: "Case Filed Successfully!",
-        description: `Your case ${newCase.case_number} has been filed with code ${caseCode}. Share this code with the respondent to join.`,
+        title: "Case Created Successfully!",
+        description: `Your case has been filed with case number: ${data.case_number}`,
       });
 
       navigate('/dashboard/claimant');
     } catch (error: any) {
-      console.error('Error filing case:', error);
+      console.error('Error creating case:', error);
       toast({
-        title: "Error Filing Case",
+        title: "Error Creating Case",
         description: error.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
@@ -146,66 +98,67 @@ const NewCasePage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
+      <div className="max-w-3xl mx-auto">
         <div className="mb-8">
-          <Button 
-            variant="ghost" 
-            onClick={() => navigate('/dashboard/claimant')}
-            className="mb-4"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
+          <Button variant="ghost" onClick={() => navigate('/dashboard/claimant')} className="mb-4">
+            ← Back to Dashboard
           </Button>
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Scale className="h-8 w-8 text-blue-600" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">File New Case</h1>
-              <p className="text-gray-600 mt-1">Submit your dispute for online resolution</p>
-            </div>
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">File a New Case</h1>
+            <p className="text-gray-600">Start your dispute resolution process</p>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Case Details
-            </CardTitle>
+            <CardTitle>Case Details</CardTitle>
             <CardDescription>
-              Please provide comprehensive details about your dispute. A unique case code will be generated for the respondent to join.
+              Provide details about your dispute to initiate the resolution process
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="title"
-                    render={({ field }) => (
-                      <FormItem className="md:col-span-2">
-                        <FormLabel>Case Title *</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="e.g., Contract Dispute with ABC Company" 
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Case Title</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Brief description of your dispute" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Detailed Description</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Provide a detailed explanation of the dispute, including relevant facts and timeline"
+                          className="min-h-[120px]"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
                     name="case_type"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Case Type *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <FormLabel>Case Type</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select case type" />
@@ -230,11 +183,11 @@ const NewCasePage = () => {
                     name="dispute_mode"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Preferred Resolution Method *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <FormLabel>Preferred Resolution Mode</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select resolution method" />
+                              <SelectValue placeholder="Select resolution mode" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -246,24 +199,28 @@ const NewCasePage = () => {
                       </FormItem>
                     )}
                   />
+                </div>
 
-                  <FormField
-                    control={form.control}
-                    name="amount_in_dispute"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Amount in Dispute</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="e.g., 50000" 
-                            type="text"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-2">
+                    <FormField
+                      control={form.control}
+                      name="amount_in_dispute"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Amount in Dispute (Optional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="0.00"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
                   <FormField
                     control={form.control}
@@ -271,7 +228,7 @@ const NewCasePage = () => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Currency</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue />
@@ -289,79 +246,13 @@ const NewCasePage = () => {
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Case Description *</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Provide a detailed description of your dispute, including relevant facts, timeline, and what resolution you're seeking..."
-                          className="min-h-[120px]"
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="border-t pt-6">
-                  <h3 className="text-lg font-semibold mb-4">Respondent Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField
-                      control={form.control}
-                      name="respondent_name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Respondent Name *</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="Full name or company name" 
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="respondent_email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Respondent Email *</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="respondent@example.com" 
-                              type="email"
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-4 pt-6">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => navigate('/dashboard/claimant')}
-                    disabled={isSubmitting}
-                  >
-                    Cancel
-                  </Button>
+                <div className="pt-6 border-t">
                   <Button 
                     type="submit" 
                     disabled={isSubmitting}
-                    className="bg-blue-600 hover:bg-blue-700"
+                    className="w-full"
                   >
-                    {isSubmitting ? 'Filing Case...' : 'File Case'}
+                    {isSubmitting ? 'Creating Case...' : 'File Case'}
                   </Button>
                 </div>
               </form>

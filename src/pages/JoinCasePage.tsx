@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -93,7 +94,11 @@ const JoinCasePage = () => {
     try {
       const { error } = await supabase
         .from('cases')
-        .update({ respondent_id: user.id, status: 'pending' })
+        .update({ 
+          respondent_id: user.id, 
+          status: 'pending',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', caseDetails.id)
         .is('respondent_id', null);
 
