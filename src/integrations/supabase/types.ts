@@ -147,6 +147,7 @@ export type Database = {
       cases: {
         Row: {
           amount_in_dispute: number | null
+          case_code: string | null
           case_number: string
           case_type: string
           claimant_id: string
@@ -165,6 +166,7 @@ export type Database = {
         }
         Insert: {
           amount_in_dispute?: number | null
+          case_code?: string | null
           case_number?: string
           case_type: string
           claimant_id: string
@@ -183,6 +185,7 @@ export type Database = {
         }
         Update: {
           amount_in_dispute?: number | null
+          case_code?: string | null
           case_number?: string
           case_type?: string
           claimant_id?: string

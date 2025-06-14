@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -19,7 +20,10 @@ const caseFormSchema = z.object({
   description: z.string().min(20, 'Description must be at least 20 characters'),
   case_type: z.enum(['civil', 'consumer', 'property', 'commercial', 'family', 'employment']),
   dispute_mode: z.enum(['mediation', 'arbitration']),
-  amount_in_dispute: z.string().optional(),
+  amount_in_dispute: z.string().optional().refine(
+    (val) => !val || !isNaN(Number(val.replace(/[^\d.]/g, ''))),
+    'Amount must be a valid number'
+  ),
   currency: z.string().default('INR'),
   respondent_email: z.string().email('Please enter a valid email address'),
   respondent_name: z.string().min(2, 'Respondent name is required'),
@@ -45,6 +49,11 @@ const NewCasePage = () => {
     defaultValues: {
       currency: 'INR',
       dispute_mode: 'mediation',
+      title: '',
+      description: '',
+      amount_in_dispute: '',
+      respondent_email: '',
+      respondent_name: '',
     },
   });
 
@@ -76,7 +85,7 @@ const NewCasePage = () => {
           .from('cases')
           .select('id')
           .eq('case_code', caseCode)
-          .single();
+          .maybeSingle();
         
         if (!existingCase) {
           isUnique = true;
@@ -196,7 +205,7 @@ const NewCasePage = () => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Case Type *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select case type" />
@@ -222,7 +231,7 @@ const NewCasePage = () => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Preferred Resolution Method *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select resolution method" />
@@ -262,7 +271,7 @@ const NewCasePage = () => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Currency</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue />
