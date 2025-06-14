@@ -12,6 +12,7 @@ import ClaimantDashboard from "./components/dashboard/ClaimantDashboard";
 import MediatorDashboard from "./components/dashboard/MediatorDashboard";
 import AdminDashboard from "./components/dashboard/AdminDashboard";
 import AuthPage from "./pages/AuthPage";
+import NewCasePage from "./pages/NewCasePage";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,11 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/case/new" element={
+              <ProtectedRoute>
+                <NewCasePage />
+              </ProtectedRoute>
+            } />
             <Route path="/dashboard" element={
               <ProtectedRoute>
                 <DashboardLayout />
