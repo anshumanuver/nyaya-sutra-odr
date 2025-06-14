@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +23,7 @@ interface DocumentListProps {
   refreshTrigger: number;
 }
 
-interface Document {
+interface CaseDocument {
   id: string;
   file_name: string;
   file_path: string;
@@ -115,13 +114,13 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
     });
   };
 
-  const downloadDocument = async (document: Document) => {
+  const downloadDocument = async (documentItem: CaseDocument) => {
     try {
-      console.log('Downloading document:', document.file_path);
+      console.log('Downloading document:', documentItem.file_path);
 
       const { data, error } = await supabase.storage
         .from('case-documents')
-        .download(document.file_path);
+        .download(documentItem.file_path);
 
       if (error) {
         console.error('Download error:', error);
@@ -132,7 +131,7 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
       const url = URL.createObjectURL(data);
       const a = document.createElement('a');
       a.href = url;
-      a.download = document.file_name;
+      a.download = documentItem.file_name;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -140,7 +139,7 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
 
       toast({
         title: "Download Started",
-        description: `Downloading ${document.file_name}`,
+        description: `Downloading ${documentItem.file_name}`,
       });
     } catch (error: any) {
       console.error('Error downloading document:', error);
@@ -152,8 +151,8 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
     }
   };
 
-  const deleteDocument = async (document: Document) => {
-    if (!user || document.uploaded_by !== user.id) {
+  const deleteDocument = async (documentItem: CaseDocument) => {
+    if (!user || documentItem.uploaded_by !== user.id) {
       toast({
         title: "Permission Denied",
         description: "You can only delete documents you uploaded.",
@@ -162,16 +161,16 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
       return;
     }
 
-    setDeletingId(document.id);
+    setDeletingId(documentItem.id);
 
     try {
-      console.log('Deleting document:', document.id);
+      console.log('Deleting document:', documentItem.id);
 
       // Delete from database first
       const { error: dbError } = await supabase
         .from('case_documents')
         .delete()
-        .eq('id', document.id);
+        .eq('id', documentItem.id);
 
       if (dbError) {
         console.error('Database delete error:', dbError);
@@ -181,7 +180,7 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
       // Delete from storage
       const { error: storageError } = await supabase.storage
         .from('case-documents')
-        .remove([document.file_path]);
+        .remove([documentItem.file_path]);
 
       if (storageError) {
         console.error('Storage delete error:', storageError);
@@ -190,7 +189,7 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
 
       toast({
         title: "Document Deleted",
-        description: `${document.file_name} has been deleted.`,
+        description: `${documentItem.file_name} has been deleted.`,
       });
 
       refetch();
@@ -239,26 +238,26 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
           </div>
         ) : (
           <div className="space-y-4">
-            {documents.map((document) => (
-              <div key={document.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+            {documents.map((documentItem) => (
+              <div key={documentItem.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3 flex-1">
-                    {getFileIcon(document.file_type)}
+                    {getFileIcon(documentItem.file_type)}
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-gray-900 truncate">{document.file_name}</h4>
+                      <h4 className="font-semibold text-gray-900 truncate">{documentItem.file_name}</h4>
                       <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
                         <Badge variant="outline" className="capitalize">
-                          {document.document_type.replace('_', ' ')}
+                          {documentItem.document_type.replace('_', ' ')}
                         </Badge>
                         <span className="flex items-center gap-1">
                           <User className="h-3 w-3" />
-                          {document.uploader_name}
+                          {documentItem.uploader_name}
                         </span>
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {formatDate(document.created_at)}
+                          {formatDate(documentItem.created_at)}
                         </span>
-                        <span>{formatFileSize(document.file_size)}</span>
+                        <span>{formatFileSize(documentItem.file_size)}</span>
                       </div>
                     </div>
                   </div>
@@ -266,19 +265,19 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => downloadDocument(document)}
+                      onClick={() => downloadDocument(documentItem)}
                     >
                       <Download className="h-4 w-4" />
                     </Button>
-                    {user && document.uploaded_by === user.id && (
+                    {user && documentItem.uploaded_by === user.id && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => deleteDocument(document)}
-                        disabled={deletingId === document.id}
+                        onClick={() => deleteDocument(documentItem)}
+                        disabled={deletingId === documentItem.id}
                         className="text-red-600 hover:text-red-700"
                       >
-                        {deletingId === document.id ? (
+                        {deletingId === documentItem.id ? (
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
                         ) : (
                           <Trash2 className="h-4 w-4" />
