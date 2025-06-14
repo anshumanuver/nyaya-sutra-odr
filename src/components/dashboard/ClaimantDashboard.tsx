@@ -24,6 +24,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import CaseCodeCard from '@/components/case/CaseCodeCard';
+import DocumentVault from '@/components/documents/DocumentVault';
 
 interface Case {
   id: string;
@@ -45,6 +46,7 @@ const ClaimantDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
 
   const { data: cases = [], isLoading, error } = useQuery({
     queryKey: ['claimant-cases', user?.id],
@@ -291,7 +293,19 @@ const ClaimantDashboard = () => {
                               <MessageSquare className="h-4 w-4 mr-2" />
                               Messages
                             </Button>
-                            <Button variant="outline" size="sm">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                setSelectedCaseId(case_item.id);
+                                // Switch to documents tab
+                                const documentsTab = document.querySelector('[data-state="active"][value="documents"]');
+                                if (!documentsTab) {
+                                  const documentsTabTrigger = document.querySelector('[value="documents"]') as HTMLElement;
+                                  documentsTabTrigger?.click();
+                                }
+                              }}
+                            >
                               <FileText className="h-4 w-4 mr-2" />
                               Documents
                             </Button>
@@ -338,22 +352,58 @@ const ClaimantDashboard = () => {
           </TabsContent>
           
           <TabsContent value="documents">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <FileText className="h-5 w-5 mr-2" />
-                  Document Vault
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Documents Yet</h3>
-                  <p className="text-gray-600 mb-4">Upload case documents and evidence here</p>
-                  <Button>Upload Documents</Button>
-                </div>
-              </CardContent>
-            </Card>
+            {selectedCaseId ? (
+              <DocumentVault caseId={selectedCaseId} />
+            ) : cases.length > 0 ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <FileText className="h-5 w-5 mr-2" />
+                    Document Vault
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8">
+                    <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Select a Case</h3>
+                    <p className="text-gray-600 mb-6">Choose a case from the "My Cases" tab to view and manage its documents</p>
+                    <div className="space-y-2">
+                      {cases.map((case_item) => (
+                        <Button
+                          key={case_item.id}
+                          variant="outline"
+                          onClick={() => setSelectedCaseId(case_item.id)}
+                          className="w-full justify-start"
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          {case_item.title} ({case_item.case_number})
+                        </Button>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <FileText className="h-5 w-5 mr-2" />
+                    Document Vault
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8">
+                    <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Cases Yet</h3>
+                    <p className="text-gray-600 mb-4">File a case first to start uploading documents</p>
+                    <Button onClick={() => navigate('/case/new')}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      File New Case
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </div>
