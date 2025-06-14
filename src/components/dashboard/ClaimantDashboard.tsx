@@ -380,9 +380,9 @@ const ClaimantDashboard = () => {
                         </Button>
                       ))}
                     </div>
-                  </CardContent>
-                </Card>
-              )
+                  </div>
+                </CardContent>
+              </Card>
             ) : (
               <Card>
                 <CardHeader>
