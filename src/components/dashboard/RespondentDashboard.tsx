@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -45,37 +44,44 @@ const RespondentDashboard = () => {
     queryFn: async () => {
       if (!user) return [];
 
-      const { data, error } = await supabase
+      // First get the cases for this respondent
+      const { data: casesData, error: casesError } = await supabase
         .from('cases')
-        .select(`
-          id,
-          case_number,
-          title,
-          case_type,
-          dispute_mode,
-          amount_in_dispute,
-          currency,
-          status,
-          description,
-          created_at,
-          claimant_id,
-          profiles!cases_claimant_id_fkey(first_name, last_name, email)
-        `)
+        .select('*')
         .eq('respondent_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching respondent cases:', error);
-        throw error;
+      if (casesError) {
+        console.error('Error fetching respondent cases:', casesError);
+        throw casesError;
       }
 
-      return data.map(caseItem => ({
-        ...caseItem,
-        claimant_name: caseItem.profiles 
-          ? `${caseItem.profiles.first_name} ${caseItem.profiles.last_name}`
-          : 'Unknown Claimant',
-        claimant_email: caseItem.profiles?.email || 'Unknown Email'
-      }));
+      if (!casesData || casesData.length === 0) {
+        return [];
+      }
+
+      // Get claimant profiles for all cases
+      const claimantIds = casesData.map(c => c.claimant_id);
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', claimantIds);
+
+      if (profilesError) {
+        console.error('Error fetching claimant profiles:', profilesError);
+      }
+
+      // Combine cases with claimant information
+      return casesData.map(caseItem => {
+        const claimantProfile = profilesData?.find(p => p.id === caseItem.claimant_id);
+        return {
+          ...caseItem,
+          claimant_name: claimantProfile 
+            ? `${claimantProfile.first_name} ${claimantProfile.last_name}`
+            : 'Unknown Claimant',
+          claimant_email: claimantProfile?.email || 'Unknown Email'
+        };
+      });
     },
     enabled: !!user,
   });
