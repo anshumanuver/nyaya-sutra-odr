@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,67 +15,130 @@ import {
   Calendar,
   MessageSquare,
   Download,
-  Eye
+  Eye,
+  Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+
+interface Case {
+  id: string;
+  case_number: string;
+  title: string;
+  case_type: string;
+  status: string;
+  amount_in_dispute: number | null;
+  currency: string | null;
+  created_at: string;
+  updated_at: string | null;
+  dispute_mode: string;
+  description: string;
+}
 
 const ClaimantDashboard = () => {
   const navigate = useNavigate();
-  const [cases] = useState([
-    {
-      id: 'ODR-2024-001',
-      title: 'Contract Dispute - ABC Services',
-      type: 'Commercial',
-      status: 'mediation',
-      progress: 60,
-      amount: '₹5,00,000',
-      mediator: 'Adv. Priya Sharma',
-      nextSession: '2024-01-15 10:00 AM',
-      created: '2024-01-01'
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  const { data: cases = [], isLoading, error } = useQuery({
+    queryKey: ['claimant-cases', user?.id],
+    queryFn: async () => {
+      if (!user?.id) throw new Error('No user ID');
+      
+      const { data, error } = await supabase
+        .from('cases')
+        .select('*')
+        .eq('claimant_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching cases:', error);
+        throw error;
+      }
+
+      return data as Case[];
     },
-    {
-      id: 'ODR-2024-002', 
-      title: 'Property Dispute - XYZ Colony',
-      type: 'Property',
-      status: 'arbitration',
-      progress: 80,
-      amount: '₹25,00,000',
-      mediator: 'Arb. Rajesh Kumar',
-      nextSession: '2024-01-18 2:00 PM',
-      created: '2023-12-15'
-    },
-    {
-      id: 'ODR-2024-003',
-      title: 'Consumer Complaint - Tech Corp',
-      type: 'Consumer',
-      status: 'completed',
-      progress: 100,
-      amount: '₹50,000',
-      mediator: 'Adv. Meera Patel',
-      result: 'Settled - ₹35,000',
-      created: '2023-11-20'
+    enabled: !!user?.id,
+  });
+
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Error Loading Cases",
+        description: "Failed to load your cases. Please try refreshing the page.",
+        variant: "destructive",
+      });
     }
-  ]);
+  }, [error, toast]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'filed': return 'bg-blue-100 text-blue-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'mediation': return 'bg-blue-100 text-blue-800';
-      case 'arbitration': return 'bg-purple-100 text-purple-800';
+      case 'mediation': return 'bg-purple-100 text-purple-800';
+      case 'arbitration': return 'bg-orange-100 text-orange-800';
       case 'completed': return 'bg-green-100 text-green-800';
+      case 'closed': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
+      case 'filed': return <FileText className="h-4 w-4" />;
       case 'pending': return <Clock className="h-4 w-4" />;
       case 'mediation': return <Users className="h-4 w-4" />;
       case 'arbitration': return <AlertCircle className="h-4 w-4" />;
       case 'completed': return <CheckCircle className="h-4 w-4" />;
+      case 'closed': return <CheckCircle className="h-4 w-4" />;
       default: return <Clock className="h-4 w-4" />;
     }
   };
+
+  const getStatusProgress = (status: string) => {
+    switch (status) {
+      case 'filed': return 20;
+      case 'pending': return 30;
+      case 'mediation': return 60;
+      case 'arbitration': return 80;
+      case 'completed': return 100;
+      case 'closed': return 100;
+      default: return 0;
+    }
+  };
+
+  const formatCurrency = (amount: number | null, currency: string | null) => {
+    if (!amount) return 'N/A';
+    const currencySymbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '₹';
+    return `${currencySymbol}${amount.toLocaleString()}`;
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const activeCases = cases.filter(c => !['completed', 'closed'].includes(c.status));
+  const resolvedCases = cases.filter(c => ['completed', 'closed'].includes(c.status));
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <span className="ml-2">Loading your cases...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -112,9 +175,7 @@ const ClaimantDashboard = () => {
                 <Clock className="h-8 w-8 text-yellow-600" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Active Cases</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {cases.filter(c => c.status !== 'completed').length}
-                  </p>
+                  <p className="text-2xl font-bold text-gray-900">{activeCases.length}</p>
                 </div>
               </div>
             </CardContent>
@@ -126,9 +187,7 @@ const ClaimantDashboard = () => {
                 <CheckCircle className="h-8 w-8 text-green-600" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Resolved</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {cases.filter(c => c.status === 'completed').length}
-                  </p>
+                  <p className="text-2xl font-bold text-gray-900">{resolvedCases.length}</p>
                 </div>
               </div>
             </CardContent>
@@ -140,7 +199,9 @@ const ClaimantDashboard = () => {
                 <AlertCircle className="h-8 w-8 text-red-600" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Pending Action</p>
-                  <p className="text-2xl font-bold text-gray-900">1</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {cases.filter(c => c.status === 'pending').length}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -156,78 +217,92 @@ const ClaimantDashboard = () => {
           </TabsList>
           
           <TabsContent value="cases" className="space-y-6">
-            <div className="grid gap-6">
-              {cases.map((case_item) => (
-                <Card key={case_item.id} className="hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-xl">{case_item.title}</CardTitle>
-                        <CardDescription className="flex items-center gap-2 mt-2">
-                          <span>Case ID: {case_item.id}</span>
-                          <Badge variant="outline">{case_item.type}</Badge>
-                        </CardDescription>
+            {cases.length === 0 ? (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Cases Filed Yet</h3>
+                  <p className="text-gray-600 mb-6">File your first dispute case to get started with online resolution</p>
+                  <Button onClick={() => navigate('/case/new')} className="bg-blue-600 hover:bg-blue-700">
+                    <Plus className="h-4 w-4 mr-2" />
+                    File Your First Case
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-6">
+                {cases.map((case_item) => (
+                  <Card key={case_item.id} className="hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-xl">{case_item.title}</CardTitle>
+                          <CardDescription className="flex items-center gap-2 mt-2">
+                            <span>Case ID: {case_item.case_number}</span>
+                            <Badge variant="outline" className="capitalize">{case_item.case_type}</Badge>
+                          </CardDescription>
+                        </div>
+                        <Badge className={getStatusColor(case_item.status)}>
+                          {getStatusIcon(case_item.status)}
+                          <span className="ml-1 capitalize">{case_item.status}</span>
+                        </Badge>
                       </div>
-                      <Badge className={getStatusColor(case_item.status)}>
-                        {getStatusIcon(case_item.status)}
-                        <span className="ml-1 capitalize">{case_item.status}</span>
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex justify-between text-sm">
-                        <span>Progress</span>
-                        <span>{case_item.progress}%</span>
-                      </div>
-                      <Progress value={case_item.progress} className="w-full" />
-                      
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-600">Amount</p>
-                          <p className="font-semibold">{case_item.amount}</p>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="flex justify-between text-sm">
+                          <span>Progress</span>
+                          <span>{getStatusProgress(case_item.status)}%</span>
                         </div>
-                        <div>
-                          <p className="text-gray-600">Assigned</p>
-                          <p className="font-semibold">{case_item.mediator}</p>
+                        <Progress value={getStatusProgress(case_item.status)} className="w-full" />
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <p className="text-gray-600">Amount</p>
+                            <p className="font-semibold">
+                              {formatCurrency(case_item.amount_in_dispute, case_item.currency)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">Resolution Method</p>
+                            <p className="font-semibold capitalize">{case_item.dispute_mode}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">Status</p>
+                            <p className="font-semibold capitalize">{case_item.status}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">Filed</p>
+                            <p className="font-semibold">{formatDate(case_item.created_at)}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-gray-600">Next Session</p>
-                          <p className="font-semibold">
-                            {case_item.nextSession || case_item.result || 'N/A'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-gray-600">Filed</p>
-                          <p className="font-semibold">{case_item.created}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-2 pt-4 border-t">
-                        <Button variant="outline" size="sm">
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Details
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <MessageSquare className="h-4 w-4 mr-2" />
-                          Messages
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <FileText className="h-4 w-4 mr-2" />
-                          Documents
-                        </Button>
-                        {case_item.status === 'completed' && (
+                        
+                        <div className="flex gap-2 pt-4 border-t">
                           <Button variant="outline" size="sm">
-                            <Download className="h-4 w-4 mr-2" />
-                            Download Result
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
                           </Button>
-                        )}
+                          <Button variant="outline" size="sm">
+                            <MessageSquare className="h-4 w-4 mr-2" />
+                            Messages
+                          </Button>
+                          <Button variant="outline" size="sm">
+                            <FileText className="h-4 w-4 mr-2" />
+                            Documents
+                          </Button>
+                          {['completed', 'closed'].includes(case_item.status) && (
+                            <Button variant="outline" size="sm">
+                              <Download className="h-4 w-4 mr-2" />
+                              Download Result
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
           
           <TabsContent value="sessions">
@@ -239,17 +314,10 @@ const ClaimantDashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {cases.filter(c => c.nextSession).map((case_item) => (
-                    <div key={case_item.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div>
-                        <h4 className="font-semibold">{case_item.title}</h4>
-                        <p className="text-sm text-gray-600">{case_item.nextSession}</p>
-                        <p className="text-sm text-gray-600">with {case_item.mediator}</p>
-                      </div>
-                      <Button variant="outline">Join Session</Button>
-                    </div>
-                  ))}
+                <div className="text-center py-8">
+                  <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Scheduled Sessions</h3>
+                  <p className="text-gray-600">Sessions will appear here once scheduled by mediators or arbitrators</p>
                 </div>
               </CardContent>
             </Card>
