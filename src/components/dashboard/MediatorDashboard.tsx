@@ -1,9 +1,11 @@
+
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { getAssignedCasesForMediator } from '@/services/caseService';
+import { getAssignedCasesForMediator, CaseWithParticipantsAndSessions } from '@/services/caseService';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { List, LayoutGrid } from 'lucide-react';
 
 import AssignmentCard from './mediator/AssignmentCard';
@@ -11,12 +13,8 @@ import CaseProgressTracker from './mediator/CaseProgressTracker';
 import SessionManager from './mediator/SessionManager';
 import SessionCalendar from './mediator/SessionCalendar';
 import MessagingPane from './messaging/MessagingPane';
-import { Database } from '@/integrations/supabase/types';
 
-type CaseWithParticipants = Database['public']['Tables']['cases']['Row'] & {
-  claimant: Database['public']['Tables']['profiles']['Row'];
-  respondent: Database['public']['Tables']['profiles']['Row'];
-};
+type CaseWithParticipants = CaseWithParticipantsAndSessions;
 
 const MediatorDashboard = () => {
   const { user, profile } = useAuth();

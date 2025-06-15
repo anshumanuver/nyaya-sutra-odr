@@ -1,27 +1,20 @@
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { CalendarIcon, Clock, MapPin, Video } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
-import { getSessionsForCase } from '@/services/sessionService';
 import { Database } from '@/integrations/supabase/types';
 
 type SessionRow = Database['public']['Tables']['case_sessions']['Row'];
 
 interface SessionCalendarProps {
-  caseId: string;
+  sessions: SessionRow[];
 }
 
-const SessionCalendar = ({ caseId }: SessionCalendarProps) => {
+const SessionCalendar = ({ sessions }: SessionCalendarProps) => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-
-  const { data: sessions = [], isLoading } = useQuery({
-    queryKey: ['case-sessions', caseId],
-    queryFn: () => getSessionsForCase(caseId),
-  });
 
   const sessionsOnSelectedDate = selectedDate
     ? sessions.filter(session => 
@@ -29,28 +22,11 @@ const SessionCalendar = ({ caseId }: SessionCalendarProps) => {
       )
     : [];
 
-  const getSessionDates = (): Date[] => {
-    return sessions.map(session => new Date(session.scheduled_at));
-  };
-
   const hasSessionOnDate = (date: Date): boolean => {
     return sessions.some(session => 
       isSameDay(new Date(session.scheduled_at), date)
     );
   };
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-2">Loading calendar...</span>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card>
