@@ -31,19 +31,19 @@ interface DocumentViewerProps {
   onClose: () => void;
 }
 
-const DocumentViewer = ({ document, isOpen, onClose }: DocumentViewerProps) => {
+const DocumentViewer = ({ document: documentData, isOpen, onClose }: DocumentViewerProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleViewDocument = async () => {
-    if (!document) return;
+    if (!documentData) return;
 
     setIsLoading(true);
     try {
       const { data, error } = await supabase.storage
         .from('case-documents')
-        .createSignedUrl(document.file_path, 3600); // 1 hour expiry
+        .createSignedUrl(documentData.file_path, 3600); // 1 hour expiry
 
       if (error) throw error;
 
@@ -61,19 +61,19 @@ const DocumentViewer = ({ document, isOpen, onClose }: DocumentViewerProps) => {
   };
 
   const downloadDocument = async () => {
-    if (!document) return;
+    if (!documentData) return;
 
     try {
       const { data, error } = await supabase.storage
         .from('case-documents')
-        .download(document.file_path);
+        .download(documentData.file_path);
 
       if (error) throw error;
 
       const url = URL.createObjectURL(data);
       const a = document.createElement('a');
       a.href = url;
-      a.download = document.file_name;
+      a.download = documentData.file_name;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -81,7 +81,7 @@ const DocumentViewer = ({ document, isOpen, onClose }: DocumentViewerProps) => {
 
       toast({
         title: "Download Started",
-        description: `Downloading ${document.file_name}`,
+        description: `Downloading ${documentData.file_name}`,
       });
     } catch (error: any) {
       console.error('Error downloading document:', error);
@@ -111,19 +111,19 @@ const DocumentViewer = ({ document, isOpen, onClose }: DocumentViewerProps) => {
     }
   };
 
-  const canPreview = document?.file_type.startsWith('image/') || document?.file_type.includes('pdf');
+  const canPreview = documentData?.file_type.startsWith('image/') || documentData?.file_type.includes('pdf');
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {document && getFileIcon(document.file_type)}
-            {document?.file_name}
+            {documentData && getFileIcon(documentData.file_type)}
+            {documentData?.file_name}
           </DialogTitle>
         </DialogHeader>
         
-        {document && (
+        {documentData && (
           <div className="space-y-4">
             {/* Document Info */}
             <div className="bg-gray-50 p-4 rounded-lg">
@@ -131,21 +131,21 @@ const DocumentViewer = ({ document, isOpen, onClose }: DocumentViewerProps) => {
                 <div>
                   <span className="font-medium">Type:</span>
                   <Badge variant="outline" className="ml-2 capitalize">
-                    {document.document_type.replace('_', ' ')}
+                    {documentData.document_type.replace('_', ' ')}
                   </Badge>
                 </div>
                 <div>
                   <span className="font-medium">Size:</span>
-                  <span className="ml-2">{formatFileSize(document.file_size)}</span>
+                  <span className="ml-2">{formatFileSize(documentData.file_size)}</span>
                 </div>
                 <div>
                   <span className="font-medium">Uploaded by:</span>
-                  <span className="ml-2">{document.uploader_name}</span>
+                  <span className="ml-2">{documentData.uploader_name}</span>
                 </div>
                 <div>
                   <span className="font-medium">Date:</span>
                   <span className="ml-2">
-                    {new Date(document.created_at).toLocaleDateString()}
+                    {new Date(documentData.created_at).toLocaleDateString()}
                   </span>
                 </div>
               </div>
@@ -172,17 +172,17 @@ const DocumentViewer = ({ document, isOpen, onClose }: DocumentViewerProps) => {
             {/* Document Preview */}
             {fileUrl && (
               <div className="border rounded-lg p-4">
-                {document.file_type.startsWith('image/') ? (
+                {documentData.file_type.startsWith('image/') ? (
                   <img 
                     src={fileUrl} 
-                    alt={document.file_name}
+                    alt={documentData.file_name}
                     className="max-w-full h-auto rounded"
                   />
-                ) : document.file_type.includes('pdf') ? (
+                ) : documentData.file_type.includes('pdf') ? (
                   <iframe
                     src={fileUrl}
                     className="w-full h-96 border rounded"
-                    title={document.file_name}
+                    title={documentData.file_name}
                   />
                 ) : (
                   <div className="text-center py-8 text-gray-500">
