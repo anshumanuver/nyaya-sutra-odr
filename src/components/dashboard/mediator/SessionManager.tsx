@@ -94,6 +94,7 @@ const SessionManager = ({ caseId }: SessionManagerProps) => {
                 session={session} 
                 onCancel={handleCancelSession}
                 isLoading={cancelSessionMutation.isPending}
+                getStatusColor={getStatusColor}
               />
             ))}
           </div>
@@ -107,9 +108,10 @@ interface SessionCardProps {
   session: SessionRow;
   onCancel: (sessionId: string) => void;
   isLoading: boolean;
+  getStatusColor: (status: string) => string;
 }
 
-const SessionCard = ({ session, onCancel, isLoading }: SessionCardProps) => {
+const SessionCard = ({ session, onCancel, isLoading, getStatusColor }: SessionCardProps) => {
   const sessionDate = new Date(session.scheduled_at);
   const isUpcoming = sessionDate > new Date();
   const canCancel = session.status === 'scheduled' && isUpcoming;

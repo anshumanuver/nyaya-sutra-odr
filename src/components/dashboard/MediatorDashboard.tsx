@@ -35,6 +35,48 @@ const MediatorDashboard = () => {
     enabled: !!user?.id
   });
 
+  // Transform case data to match component expectations
+  const transformCaseToAssignment = (caseData: any) => ({
+    id: caseData.id,
+    title: caseData.title,
+    type: caseData.case_type,
+    mode: caseData.dispute_mode,
+    priority: 'medium', // Default priority since it's not in the database
+    parties: [
+      `${caseData.claimant?.first_name} ${caseData.claimant?.last_name}`,
+      `${caseData.respondent?.first_name} ${caseData.respondent?.last_name}`
+    ],
+    amount: `₹${caseData.amount_in_dispute?.toLocaleString() || '0'}`,
+    assignedAt: caseData.created_at
+  });
+
+  const transformCaseToCaseItem = (caseData: any) => ({
+    id: caseData.id,
+    title: caseData.title,
+    status: caseData.status,
+    parties: [
+      `${caseData.claimant?.first_name} ${caseData.claimant?.last_name}`,
+      `${caseData.respondent?.first_name} ${caseData.respondent?.last_name}`
+    ],
+    amount: `₹${caseData.amount_in_dispute?.toLocaleString() || '0'}`,
+    createdAt: caseData.created_at
+  });
+
+  const handleAcceptAssignment = (assignmentId: string) => {
+    console.log('Accepting assignment:', assignmentId);
+    // TODO: Implement assignment acceptance
+  };
+
+  const handleDeclineAssignment = (assignmentId: string) => {
+    console.log('Declining assignment:', assignmentId);
+    // TODO: Implement assignment decline
+  };
+
+  const handleStatusUpdate = (caseId: string, newStatus: string) => {
+    console.log('Updating case status:', caseId, newStatus);
+    // TODO: Implement status update
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -105,8 +147,15 @@ const MediatorDashboard = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {assignedCases.map((caseData) => (
               <div key={caseData.id} className="space-y-4">
-                <AssignmentCard caseData={caseData} />
-                <CaseProgressTracker caseData={caseData} />
+                <AssignmentCard 
+                  assignment={transformCaseToAssignment(caseData)}
+                  onAccept={handleAcceptAssignment}
+                  onDecline={handleDeclineAssignment}
+                />
+                <CaseProgressTracker 
+                  caseItem={transformCaseToCaseItem(caseData)}
+                  onStatusUpdate={handleStatusUpdate}
+                />
               </div>
             ))}
           </div>

@@ -57,7 +57,7 @@ const SessionsTab = () => {
         ) : (
           <div className="space-y-4">
             {sessions.map((session) => (
-              <SessionCard key={session.id} session={session} />
+              <SessionCard key={session.id} session={session} getStatusColor={getStatusColor} />
             ))}
           </div>
         )}
@@ -68,9 +68,10 @@ const SessionsTab = () => {
 
 interface SessionCardProps {
   session: SessionRow;
+  getStatusColor: (status: string) => string;
 }
 
-const SessionCard = ({ session }: SessionCardProps) => {
+const SessionCard = ({ session, getStatusColor }: SessionCardProps) => {
   const sessionDate = new Date(session.scheduled_at);
 
   return (
