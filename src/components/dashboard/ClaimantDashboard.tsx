@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import CaseCodeCard from '@/components/case/CaseCodeCard';
 import DocumentVault from '@/components/documents/DocumentVault';
+import ClaimantStats from './ClaimantStats';
+import CaseDetailsModal from './CaseDetailsModal';
 
 interface Case {
   id: string;
@@ -47,6 +50,8 @@ const ClaimantDashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [selectedCaseForDetails, setSelectedCaseForDetails] = useState<Case | null>(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
   const { data: cases = [], isLoading, error } = useQuery({
     queryKey: ['claimant-cases', user?.id],
@@ -129,17 +134,10 @@ const ClaimantDashboard = () => {
     });
   };
 
-  const activeCases = cases.filter(c => !['completed', 'closed'].includes(c.status));
-  const resolvedCases = cases.filter(c => ['completed', 'closed'].includes(c.status));
-  const casesAwaitingRespondent = cases.filter(c => !c.respondent_id);
-
   // Function to handle viewing case details
   const viewCaseDetails = (caseItem: Case) => {
-    toast({
-      title: "Case Details",
-      description: `Viewing details for ${caseItem.case_number}`,
-    });
-    // TODO: Navigate to case details page when implemented
+    setSelectedCaseForDetails(caseItem);
+    setIsDetailsModalOpen(true);
   };
 
   // Function to handle messages
@@ -157,6 +155,14 @@ const ClaimantDashboard = () => {
     // Switch to documents tab
     const documentsTab = document.querySelector('[value="documents"]') as HTMLElement;
     documentsTab?.click();
+  };
+
+  const downloadCaseResult = (caseItem: Case) => {
+    toast({
+      title: "Download Started",
+      description: `Downloading case result for ${caseItem.case_number}`,
+    });
+    // TODO: Implement actual download functionality
   };
 
   if (isLoading) {
@@ -188,54 +194,8 @@ const ClaimantDashboard = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <FileText className="h-8 w-8 text-blue-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Total Cases</p>
-                  <p className="text-2xl font-bold text-gray-900">{cases.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Clock className="h-8 w-8 text-yellow-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Active Cases</p>
-                  <p className="text-2xl font-bold text-gray-900">{activeCases.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <CheckCircle className="h-8 w-8 text-green-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Resolved</p>
-                  <p className="text-2xl font-bold text-gray-900">{resolvedCases.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <UserPlus className="h-8 w-8 text-orange-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Awaiting Respondent</p>
-                  <p className="text-2xl font-bold text-gray-900">{casesAwaitingRespondent.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="mb-8">
+          <ClaimantStats cases={cases} />
         </div>
 
         {/* Main Content */}
@@ -310,7 +270,7 @@ const ClaimantDashboard = () => {
                             </div>
                           </div>
                           
-                          <div className="flex gap-2 pt-4 border-t">
+                          <div className="flex flex-wrap gap-2 pt-4 border-t">
                             <Button variant="outline" size="sm" onClick={() => viewCaseDetails(case_item)}>
                               <Eye className="h-4 w-4 mr-2" />
                               View Details
@@ -328,7 +288,11 @@ const ClaimantDashboard = () => {
                               Documents
                             </Button>
                             {['completed', 'closed'].includes(case_item.status) && (
-                              <Button variant="outline" size="sm">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => downloadCaseResult(case_item)}
+                              >
                                 <Download className="h-4 w-4 mr-2" />
                                 Download Result
                               </Button>
@@ -424,6 +388,16 @@ const ClaimantDashboard = () => {
             )}
           </TabsContent>
         </Tabs>
+
+        {/* Case Details Modal */}
+        <CaseDetailsModal
+          case_item={selectedCaseForDetails}
+          isOpen={isDetailsModalOpen}
+          onClose={() => {
+            setIsDetailsModalOpen(false);
+            setSelectedCaseForDetails(null);
+          }}
+        />
       </div>
     </div>
   );
