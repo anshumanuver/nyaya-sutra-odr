@@ -2,15 +2,15 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Upload, FileText, AlertCircle, Shield } from 'lucide-react';
+import { Upload, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import FileInput from './upload/FileInput';
+import DocumentTypeSelect from './upload/DocumentTypeSelect';
+import ConfidentialityToggle from './upload/ConfidentialityToggle';
+import { uploadDocument } from './upload/UploadService';
 
 interface DocumentUploadProps {
   caseId: string;
@@ -26,58 +26,6 @@ const DocumentUpload = ({ caseId, onUploadComplete }: DocumentUploadProps) => {
   const [description, setDescription] = useState('');
   const [isConfidential, setIsConfidential] = useState(false);
 
-  const allowedFileTypes = [
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'text/plain'
-  ];
-
-  const maxFileSize = 10 * 1024 * 1024; // 10MB
-
-  const documentTypes = [
-    { value: 'evidence', label: 'Evidence' },
-    { value: 'contract', label: 'Contract' },
-    { value: 'correspondence', label: 'Correspondence' },
-    { value: 'receipt', label: 'Receipt/Invoice' },
-    { value: 'legal_notice', label: 'Legal Notice' },
-    { value: 'statement', label: 'Statement' },
-    { value: 'agreement', label: 'Agreement' },
-    { value: 'report', label: 'Report' },
-    { value: 'other', label: 'Other' }
-  ];
-
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!allowedFileTypes.includes(file.type)) {
-      toast({
-        title: "Invalid File Type",
-        description: "Please upload PDF, Word documents, images, or text files only.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validate file size
-    if (file.size > maxFileSize) {
-      toast({
-        title: "File Too Large",
-        description: "Please upload files smaller than 10MB.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setSelectedFile(file);
-    console.log('Selected file:', file.name, file.type, file.size);
-  };
-
   const handleUpload = async () => {
     if (!selectedFile || !documentType || !user) {
       toast({
@@ -91,57 +39,13 @@ const DocumentUpload = ({ caseId, onUploadComplete }: DocumentUploadProps) => {
     setIsUploading(true);
 
     try {
-      // Create unique filename with timestamp
-      const timestamp = new Date().getTime();
-      const fileExtension = selectedFile.name.split('.').pop();
-      const fileName = `${caseId}/${timestamp}_${selectedFile.name}`;
-
-      console.log('Uploading file:', fileName);
-
-      // Upload file to Supabase storage with metadata
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('case-documents')
-        .upload(fileName, selectedFile, {
-          cacheControl: '3600',
-          upsert: false,
-          metadata: {
-            caseId: caseId,
-            documentType: documentType,
-            uploadedBy: user.id,
-            isConfidential: isConfidential.toString()
-          }
-        });
-
-      if (uploadError) {
-        console.error('Storage upload error:', uploadError);
-        throw uploadError;
-      }
-
-      console.log('File uploaded to storage:', uploadData);
-
-      // Insert document record in database
-      const { error: dbError } = await supabase
-        .from('case_documents')
-        .insert({
-          case_id: caseId,
-          file_name: selectedFile.name,
-          file_path: fileName,
-          file_type: selectedFile.type,
-          file_size: selectedFile.size,
-          document_type: documentType,
-          uploaded_by: user.id,
-          is_confidential: isConfidential,
-          // Store description in a future metadata column if needed
-        });
-
-      if (dbError) {
-        console.error('Database insert error:', dbError);
-        // If database insert fails, cleanup the uploaded file
-        await supabase.storage.from('case-documents').remove([fileName]);
-        throw dbError;
-      }
-
-      console.log('Document record created in database');
+      await uploadDocument({
+        file: selectedFile,
+        caseId,
+        documentType,
+        isConfidential,
+        userId: user.id
+      });
 
       toast({
         title: "Document Uploaded",
@@ -183,58 +87,20 @@ const DocumentUpload = ({ caseId, onUploadComplete }: DocumentUploadProps) => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div>
-          <Label htmlFor="file-upload">Select File</Label>
-          <Input
-            id="file-upload"
-            type="file"
-            onChange={handleFileSelect}
-            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.txt"
-            className="mt-1"
-          />
-          {selectedFile && (
-            <div className="mt-2 p-2 bg-gray-50 rounded-md">
-              <div className="flex items-center gap-2 text-sm">
-                <FileText className="h-4 w-4" />
-                <span>{selectedFile.name}</span>
-                <span className="text-gray-500">({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)</span>
-              </div>
-            </div>
-          )}
-        </div>
+        <FileInput 
+          onFileSelect={setSelectedFile}
+          selectedFile={selectedFile}
+        />
 
-        <div>
-          <Label htmlFor="document-type">Document Type</Label>
-          <Select value={documentType} onValueChange={setDocumentType}>
-            <SelectTrigger className="mt-1">
-              <SelectValue placeholder="Select document type" />
-            </SelectTrigger>
-            <SelectContent>
-              {documentTypes.map((type) => (
-                <SelectItem key={type.value} value={type.value}>
-                  {type.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <DocumentTypeSelect 
+          value={documentType}
+          onChange={setDocumentType}
+        />
 
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <Label htmlFor="confidential" className="flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              Mark as Confidential
-            </Label>
-            <p className="text-sm text-gray-600">
-              Restrict access to case parties and mediator only
-            </p>
-          </div>
-          <Switch
-            id="confidential"
-            checked={isConfidential}
-            onCheckedChange={setIsConfidential}
-          />
-        </div>
+        <ConfidentialityToggle 
+          isConfidential={isConfidential}
+          onChange={setIsConfidential}
+        />
 
         <div>
           <Label htmlFor="description">Description (Optional)</Label>
