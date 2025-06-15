@@ -12,11 +12,15 @@ import {
   User,
   FileIcon,
   ImageIcon,
-  FileTextIcon
+  FileTextIcon,
+  Shield,
+  Settings
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import DocumentViewer from './DocumentViewer';
+import DocumentAccessControl from './DocumentAccessControl';
 
 interface DocumentListProps {
   caseId: string;
@@ -40,6 +44,8 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [viewerDocument, setViewerDocument] = useState<CaseDocument | null>(null);
+  const [accessControlDocument, setAccessControlDocument] = useState<CaseDocument | null>(null);
 
   const { data: documents = [], isLoading, refetch } = useQuery({
     queryKey: ['case-documents', caseId, refreshTrigger],
@@ -219,79 +225,121 @@ const DocumentList = ({ caseId, refreshTrigger }: DocumentListProps) => {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5" />
-          Case Documents
-        </CardTitle>
-        <CardDescription>
-          {documents.length} document{documents.length !== 1 ? 's' : ''} uploaded
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {documents.length === 0 ? (
-          <div className="text-center py-8">
-            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Documents Yet</h3>
-            <p className="text-gray-600">Upload documents using the "Upload New" tab</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {documents.map((documentItem) => (
-              <div key={documentItem.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3 flex-1">
-                    {getFileIcon(documentItem.file_type)}
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-gray-900 truncate">{documentItem.file_name}</h4>
-                      <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
-                        <Badge variant="outline" className="capitalize">
-                          {documentItem.document_type.replace('_', ' ')}
-                        </Badge>
-                        <span className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          {documentItem.uploader_name}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {formatDate(documentItem.created_at)}
-                        </span>
-                        <span>{formatFileSize(documentItem.file_size)}</span>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Case Documents
+          </CardTitle>
+          <CardDescription>
+            {documents.length} document{documents.length !== 1 ? 's' : ''} uploaded
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {documents.length === 0 ? (
+            <div className="text-center py-8">
+              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Documents Yet</h3>
+              <p className="text-gray-600">Upload documents using the "Upload New" tab</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {documents.map((documentItem) => (
+                <div key={documentItem.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3 flex-1">
+                      {getFileIcon(documentItem.file_type)}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold text-gray-900 truncate">{documentItem.file_name}</h4>
+                          {documentItem.is_confidential && (
+                            <Badge variant="secondary" className="text-xs">
+                              <Shield className="h-3 w-3 mr-1" />
+                              Confidential
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
+                          <Badge variant="outline" className="capitalize">
+                            {documentItem.document_type.replace('_', ' ')}
+                          </Badge>
+                          <span className="flex items-center gap-1">
+                            <User className="h-3 w-3" />
+                            {documentItem.uploader_name}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {formatDate(documentItem.created_at)}
+                          </span>
+                          <span>{formatFileSize(documentItem.file_size)}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 ml-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => downloadDocument(documentItem)}
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    {user && documentItem.uploaded_by === user.id && (
+                    <div className="flex items-center gap-2 ml-4">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => deleteDocument(documentItem)}
-                        disabled={deletingId === documentItem.id}
-                        className="text-red-600 hover:text-red-700"
+                        onClick={() => setViewerDocument(documentItem)}
                       >
-                        {deletingId === documentItem.id ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
+                        <Eye className="h-4 w-4" />
                       </Button>
-                    )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => downloadDocument(documentItem)}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      {user && documentItem.uploaded_by === user.id && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setAccessControlDocument(documentItem)}
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => deleteDocument(documentItem)}
+                            disabled={deletingId === documentItem.id}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            {deletingId === documentItem.id ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <DocumentViewer 
+        document={viewerDocument}
+        isOpen={!!viewerDocument}
+        onClose={() => setViewerDocument(null)}
+      />
+
+      <DocumentAccessControl 
+        document={accessControlDocument}
+        isOpen={!!accessControlDocument}
+        onClose={() => setAccessControlDocument(null)}
+        onUpdate={() => {
+          refetch();
+          setAccessControlDocument(null);
+        }}
+      />
+    </>
   );
 };
 

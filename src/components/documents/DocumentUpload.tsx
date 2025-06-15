@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Upload, FileText, AlertCircle } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Upload, FileText, AlertCircle, Shield } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -23,6 +24,7 @@ const DocumentUpload = ({ caseId, onUploadComplete }: DocumentUploadProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [documentType, setDocumentType] = useState('');
   const [description, setDescription] = useState('');
+  const [isConfidential, setIsConfidential] = useState(false);
 
   const allowedFileTypes = [
     'application/pdf',
@@ -35,6 +37,18 @@ const DocumentUpload = ({ caseId, onUploadComplete }: DocumentUploadProps) => {
   ];
 
   const maxFileSize = 10 * 1024 * 1024; // 10MB
+
+  const documentTypes = [
+    { value: 'evidence', label: 'Evidence' },
+    { value: 'contract', label: 'Contract' },
+    { value: 'correspondence', label: 'Correspondence' },
+    { value: 'receipt', label: 'Receipt/Invoice' },
+    { value: 'legal_notice', label: 'Legal Notice' },
+    { value: 'statement', label: 'Statement' },
+    { value: 'agreement', label: 'Agreement' },
+    { value: 'report', label: 'Report' },
+    { value: 'other', label: 'Other' }
+  ];
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -84,12 +98,18 @@ const DocumentUpload = ({ caseId, onUploadComplete }: DocumentUploadProps) => {
 
       console.log('Uploading file:', fileName);
 
-      // Upload file to Supabase storage
+      // Upload file to Supabase storage with metadata
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('case-documents')
         .upload(fileName, selectedFile, {
           cacheControl: '3600',
-          upsert: false
+          upsert: false,
+          metadata: {
+            caseId: caseId,
+            documentType: documentType,
+            uploadedBy: user.id,
+            isConfidential: isConfidential.toString()
+          }
         });
 
       if (uploadError) {
@@ -110,7 +130,8 @@ const DocumentUpload = ({ caseId, onUploadComplete }: DocumentUploadProps) => {
           file_size: selectedFile.size,
           document_type: documentType,
           uploaded_by: user.id,
-          is_confidential: false
+          is_confidential: isConfidential,
+          // Store description in a future metadata column if needed
         });
 
       if (dbError) {
@@ -131,6 +152,7 @@ const DocumentUpload = ({ caseId, onUploadComplete }: DocumentUploadProps) => {
       setSelectedFile(null);
       setDocumentType('');
       setDescription('');
+      setIsConfidential(false);
       
       // Clear file input
       const fileInput = document.getElementById('file-upload') as HTMLInputElement;
@@ -188,15 +210,30 @@ const DocumentUpload = ({ caseId, onUploadComplete }: DocumentUploadProps) => {
               <SelectValue placeholder="Select document type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="evidence">Evidence</SelectItem>
-              <SelectItem value="contract">Contract</SelectItem>
-              <SelectItem value="correspondence">Correspondence</SelectItem>
-              <SelectItem value="receipt">Receipt/Invoice</SelectItem>
-              <SelectItem value="legal_notice">Legal Notice</SelectItem>
-              <SelectItem value="statement">Statement</SelectItem>
-              <SelectItem value="other">Other</SelectItem>
+              {documentTypes.map((type) => (
+                <SelectItem key={type.value} value={type.value}>
+                  {type.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <Label htmlFor="confidential" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Mark as Confidential
+            </Label>
+            <p className="text-sm text-gray-600">
+              Restrict access to case parties and mediator only
+            </p>
+          </div>
+          <Switch
+            id="confidential"
+            checked={isConfidential}
+            onCheckedChange={setIsConfidential}
+          />
         </div>
 
         <div>
