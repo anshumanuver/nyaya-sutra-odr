@@ -6,7 +6,8 @@ import {
   Calendar, 
   MessageSquare, 
   Settings,
-  UserPlus
+  UserPlus,
+  User
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -29,12 +30,14 @@ export const navigationItems: NavigationItems = {
     { icon: Calendar, label: 'Sessions', path: '/dashboard/claimant/sessions' },
     { icon: MessageSquare, label: 'Messages', path: '/dashboard/claimant/messages' },
     { icon: UserPlus, label: 'Join Case', path: '/join-case' },
+    { icon: User, label: 'Profile', path: '/profile' },
   ],
   mediator: [
     { icon: Home, label: 'Dashboard', path: '/dashboard/mediator' },
     { icon: FileText, label: 'Assignments', path: '/dashboard/mediator/assignments' },
     { icon: Calendar, label: 'Calendar', path: '/dashboard/mediator/calendar' },
     { icon: Users, label: 'Parties', path: '/dashboard/mediator/parties' },
+    { icon: User, label: 'Profile', path: '/profile' },
   ],
   respondent: [
     { icon: Home, label: 'Dashboard', path: '/dashboard/respondent' },
@@ -42,12 +45,14 @@ export const navigationItems: NavigationItems = {
     { icon: Calendar, label: 'Sessions', path: '/dashboard/respondent/sessions' },
     { icon: MessageSquare, label: 'Messages', path: '/dashboard/respondent/messages' },
     { icon: UserPlus, label: 'Join Case', path: '/join-case' },
+    { icon: User, label: 'Profile', path: '/profile' },
   ],
   admin: [
     { icon: Home, label: 'Dashboard', path: '/dashboard/admin' },
     { icon: FileText, label: 'Cases', path: '/dashboard/admin/cases' },
     { icon: Users, label: 'Neutrals', path: '/dashboard/admin/neutrals' },
     { icon: Settings, label: 'System', path: '/dashboard/admin/system' },
+    { icon: User, label: 'Profile', path: '/profile' },
   ],
 };
 

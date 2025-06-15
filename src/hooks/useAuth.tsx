@@ -14,6 +14,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, userData: any) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<{ error: any }>;
+  getRoleDashboardPath: () => string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -79,6 +80,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return { error };
   };
 
+  const getRoleDashboardPath = (): string => {
+    if (!profile) return '/dashboard/claimant';
+    
+    switch (profile.role) {
+      case 'mediator': return '/dashboard/mediator';
+      case 'admin': return '/dashboard/admin';
+      case 'respondent': return '/dashboard/respondent';
+      default: return '/dashboard/claimant';
+    }
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -87,7 +99,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       loading,
       signUp,
       signIn,
-      signOut
+      signOut,
+      getRoleDashboardPath
     }}>
       {children}
     </AuthContext.Provider>

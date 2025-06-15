@@ -12,9 +12,10 @@ import { useAuth } from '@/hooks/useAuth';
 interface LoginFormProps {
   onBack: () => void;
   onToggleMode: () => void;
+  onForgotPassword: () => void;
 }
 
-const LoginForm = ({ onBack, onToggleMode }: LoginFormProps) => {
+const LoginForm = ({ onBack, onToggleMode, onForgotPassword }: LoginFormProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,7 +41,7 @@ const LoginForm = ({ onBack, onToggleMode }: LoginFormProps) => {
           title: "Login Successful",
           description: "Welcome back! Redirecting to dashboard...",
         });
-        navigate('/dashboard/claimant');
+        // Role-based redirection will be handled by AuthPage
       }
     } catch (error) {
       toast({
@@ -98,7 +99,10 @@ const LoginForm = ({ onBack, onToggleMode }: LoginFormProps) => {
               {loading ? 'Signing In...' : 'Sign In'}
             </Button>
           </form>
-          <div className="mt-4 text-center">
+          <div className="mt-4 space-y-2 text-center">
+            <Button variant="link" onClick={onForgotPassword} className="text-sm">
+              Forgot your password?
+            </Button>
             <Button variant="link" onClick={onToggleMode}>
               Don't have an account? Register here
             </Button>

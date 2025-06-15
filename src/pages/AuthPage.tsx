@@ -4,15 +4,19 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import LoginForm from '@/components/auth/LoginForm';
 import RegisterForm from '@/components/auth/RegisterForm';
+import PasswordResetForm from '@/components/auth/PasswordResetForm';
+
+type AuthMode = 'login' | 'register' | 'reset';
 
 const AuthPage = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [mode, setMode] = useState<AuthMode>('login');
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
-  // Redirect if already authenticated
-  if (user) {
-    navigate('/dashboard/claimant');
+  // Redirect if already authenticated based on role
+  if (user && profile) {
+    const rolePath = getRoleDashboardPath(profile.role);
+    navigate(rolePath);
     return null;
   }
 
@@ -21,18 +25,34 @@ const AuthPage = () => {
   };
 
   const toggleMode = () => {
-    setIsLogin(!isLogin);
+    setMode(mode === 'login' ? 'register' : 'login');
   };
 
-  return (
-    <>
-      {isLogin ? (
-        <LoginForm onBack={handleBack} onToggleMode={toggleMode} />
-      ) : (
-        <RegisterForm onBack={handleBack} onToggleMode={toggleMode} />
-      )}
-    </>
-  );
+  const showResetForm = () => {
+    setMode('reset');
+  };
+
+  const backToLogin = () => {
+    setMode('login');
+  };
+
+  switch (mode) {
+    case 'reset':
+      return <PasswordResetForm onBack={backToLogin} />;
+    case 'register':
+      return <RegisterForm onBack={handleBack} onToggleMode={toggleMode} />;
+    default:
+      return <LoginForm onBack={handleBack} onToggleMode={toggleMode} onForgotPassword={showResetForm} />;
+  }
+};
+
+const getRoleDashboardPath = (role: string): string => {
+  switch (role) {
+    case 'mediator': return '/dashboard/mediator';
+    case 'admin': return '/dashboard/admin';
+    case 'respondent': return '/dashboard/respondent';
+    default: return '/dashboard/claimant';
+  }
 };
 
 export default AuthPage;

@@ -15,6 +15,7 @@ import AdminDashboard from "./components/dashboard/AdminDashboard";
 import AuthPage from "./pages/AuthPage";
 import NewCasePage from "./pages/NewCasePage";
 import JoinCasePage from "./pages/JoinCasePage";
+import ProfilePage from "./pages/ProfilePage";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,11 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/join-case" element={<JoinCasePage />} />
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            } />
             <Route path="/case/new" element={
               <ProtectedRoute>
                 <NewCasePage />
