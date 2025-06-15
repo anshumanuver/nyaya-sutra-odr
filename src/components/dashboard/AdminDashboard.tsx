@@ -8,6 +8,7 @@ import UnassignedCasesList from './admin/UnassignedCasesList';
 import MediatorAssignmentDialog from './admin/MediatorAssignmentDialog';
 import MediatorsList from './admin/MediatorsList';
 import SystemOverview from './admin/SystemOverview';
+import CasesOverview from './CasesOverview';
 
 const AdminDashboard = () => {
   const [selectedCase, setSelectedCase] = useState<any>(null);
@@ -114,12 +115,17 @@ const AdminDashboard = () => {
         />
 
         {/* Main Content */}
-        <Tabs defaultValue="unassigned" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs defaultValue="all-cases" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="all-cases">All Cases</TabsTrigger>
             <TabsTrigger value="unassigned">Unassigned Cases</TabsTrigger>
             <TabsTrigger value="mediators">Mediators</TabsTrigger>
             <TabsTrigger value="overview">System Overview</TabsTrigger>
           </TabsList>
+          
+          <TabsContent value="all-cases" className="space-y-6">
+            <CasesOverview userRole="admin" onAssignMediator={handleAssignMediator} />
+          </TabsContent>
           
           <TabsContent value="unassigned" className="space-y-6">
             <UnassignedCasesList

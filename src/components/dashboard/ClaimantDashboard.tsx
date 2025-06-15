@@ -1,148 +1,79 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
-import ClaimantStats from './ClaimantStats';
-import CaseDetailsModal from './CaseDetailsModal';
+import { Button } from '@/components/ui/button';
+import { Plus, Calendar, FileText, MessageSquare } from 'lucide-react';
 import ClaimantDashboardHeader from './ClaimantDashboardHeader';
-import CasesList from './CasesList';
+import ClaimantStats from './ClaimantStats';
+import CasesOverview from './CasesOverview';
 import SessionsTab from './SessionsTab';
 import DocumentsTab from './DocumentsTab';
 
-interface Case {
-  id: string;
-  case_number: string;
-  title: string;
-  case_type: string;
-  status: string;
-  amount_in_dispute: number | null;
-  currency: string | null;
-  created_at: string;
-  updated_at: string | null;
-  dispute_mode: string;
-  description: string;
-  case_code: string | null;
-  respondent_id: string | null;
-}
-
 const ClaimantDashboard = () => {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
-  const [selectedCaseForDetails, setSelectedCaseForDetails] = useState<Case | null>(null);
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-
-  const { data: cases = [], isLoading, error } = useQuery({
-    queryKey: ['claimant-cases', user?.id],
-    queryFn: async () => {
-      if (!user?.id) throw new Error('No user ID');
-      
-      const { data, error } = await supabase
-        .from('cases')
-        .select('*')
-        .eq('claimant_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching cases:', error);
-        throw error;
-      }
-
-      return data as Case[];
-    },
-    enabled: !!user?.id,
-  });
-
-  useEffect(() => {
-    if (error) {
-      toast({
-        title: "Error Loading Cases",
-        description: "Failed to load your cases. Please try refreshing the page.",
-        variant: "destructive",
-      });
-    }
-  }, [error, toast]);
-
-  // Function to handle viewing case details
-  const viewCaseDetails = (caseItem: Case) => {
-    setSelectedCaseForDetails(caseItem);
-    setIsDetailsModalOpen(true);
-  };
-
-  // Function to switch to documents tab and select case
-  const viewCaseDocuments = (caseItem: Case) => {
-    setSelectedCaseId(caseItem.id);
-    // Switch to documents tab
-    const documentsTab = document.querySelector('[value="documents"]') as HTMLElement;
-    documentsTab?.click();
-  };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin" />
-            <span className="ml-2">Loading your cases...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('cases');
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <ClaimantDashboardHeader />
+        <ClaimantStats />
 
-        {/* Stats Cards */}
-        <div className="mb-8">
-          <ClaimantStats cases={cases} />
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Case Management</h2>
+            <p className="text-gray-600">Manage your dispute resolution cases</p>
+          </div>
+          <Button 
+            onClick={() => navigate('/case/new')}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            File New Case
+          </Button>
         </div>
 
-        {/* Main Content */}
-        <Tabs defaultValue="cases" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="cases">My Cases</TabsTrigger>
-            <TabsTrigger value="sessions">Upcoming Sessions</TabsTrigger>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="cases" className="flex items-center space-x-2">
+              <FileText className="h-4 w-4" />
+              <span>My Cases</span>
+            </TabsTrigger>
+            <TabsTrigger value="sessions" className="flex items-center space-x-2">
+              <Calendar className="h-4 w-4" />
+              <span>Sessions</span>
+            </TabsTrigger>
+            <TabsTrigger value="documents" className="flex items-center space-x-2">
+              <FileText className="h-4 w-4" />
+              <span>Documents</span>
+            </TabsTrigger>
+            <TabsTrigger value="messages" className="flex items-center space-x-2">
+              <MessageSquare className="h-4 w-4" />
+              <span>Messages</span>
+            </TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="cases" className="space-y-6">
-            <CasesList 
-              cases={cases}
-              onViewDetails={viewCaseDetails}
-              onViewDocuments={viewCaseDocuments}
-            />
+            <CasesOverview userRole="claimant" />
           </TabsContent>
-          
-          <TabsContent value="sessions">
+
+          <TabsContent value="sessions" className="space-y-6">
             <SessionsTab />
           </TabsContent>
-          
-          <TabsContent value="documents">
-            <DocumentsTab 
-              cases={cases}
-              selectedCaseId={selectedCaseId}
-              onSelectCase={setSelectedCaseId}
-            />
+
+          <TabsContent value="documents" className="space-y-6">
+            <DocumentsTab />
+          </TabsContent>
+
+          <TabsContent value="messages" className="space-y-6">
+            <div className="text-center py-12">
+              <MessageSquare className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Messages Coming Soon</h3>
+              <p className="text-gray-600">Direct messaging with mediators and other parties will be available soon.</p>
+            </div>
           </TabsContent>
         </Tabs>
-
-        {/* Case Details Modal */}
-        <CaseDetailsModal
-          case_item={selectedCaseForDetails}
-          isOpen={isDetailsModalOpen}
-          onClose={() => {
-            setIsDetailsModalOpen(false);
-            setSelectedCaseForDetails(null);
-          }}
-        />
       </div>
     </div>
   );

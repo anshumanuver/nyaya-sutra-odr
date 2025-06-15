@@ -1,167 +1,66 @@
 
-import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { getAssignedCasesForMediator, CaseWithParticipantsAndSessions } from '@/services/caseService';
-import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { List, LayoutGrid } from 'lucide-react';
-
-import AssignmentCard from './mediator/AssignmentCard';
-import CaseProgressTracker from './mediator/CaseProgressTracker';
-import SessionManager from './mediator/SessionManager';
-import SessionCalendar from './mediator/SessionCalendar';
-import MessagingPane from './messaging/MessagingPane';
-
-type CaseWithParticipants = CaseWithParticipantsAndSessions;
+import { Calendar, FileText, MessageSquare, Users } from 'lucide-react';
+import CasesOverview from './CasesOverview';
+import SessionsTab from './SessionsTab';
+import DocumentsTab from './DocumentsTab';
 
 const MediatorDashboard = () => {
-  const { user, profile } = useAuth();
-  const [viewMode, setViewMode] = useState('list');
-  
-  const { data: assignedCases = [], isLoading } = useQuery<CaseWithParticipants[]>({
-    queryKey: ['assignedCases', user?.id],
-    queryFn: () => getAssignedCasesForMediator(user!.id),
-    enabled: !!user?.id
-  });
-
-  // Transform case data to match component expectations
-  const transformCaseToAssignment = (caseData: any) => ({
-    id: caseData.id,
-    title: caseData.title,
-    type: caseData.case_type,
-    mode: caseData.dispute_mode,
-    priority: 'medium', // Default priority since it's not in the database
-    parties: [
-      `${caseData.claimant?.first_name} ${caseData.claimant?.last_name}`,
-      `${caseData.respondent?.first_name} ${caseData.respondent?.last_name}`
-    ],
-    amount: `₹${caseData.amount_in_dispute?.toLocaleString() || '0'}`,
-    assignedAt: caseData.created_at
-  });
-
-  const transformCaseToCaseItem = (caseData: any) => ({
-    id: caseData.id,
-    title: caseData.title,
-    status: caseData.status,
-    parties: [
-      `${caseData.claimant?.first_name} ${caseData.claimant?.last_name}`,
-      `${caseData.respondent?.first_name} ${caseData.respondent?.last_name}`
-    ],
-    amount: `₹${caseData.amount_in_dispute?.toLocaleString() || '0'}`,
-    createdAt: caseData.created_at
-  });
-
-  const handleAcceptAssignment = (assignmentId: string) => {
-    console.log('Accepting assignment:', assignmentId);
-    // TODO: Implement assignment acceptance
-  };
-
-  const handleDeclineAssignment = (assignmentId: string) => {
-    console.log('Declining assignment:', assignmentId);
-    // TODO: Implement assignment decline
-  };
-
-  const handleStatusUpdate = (caseId: string, newStatus: string) => {
-    console.log('Updating case status:', caseId, newStatus);
-    // TODO: Implement status update
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-2">Loading dashboard...</span>
-      </div>
-    );
-  }
+  const [activeTab, setActiveTab] = useState('cases');
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>My Calendar</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <SessionCalendar sessions={assignedCases.flatMap(c => c.case_sessions || [])} />
-        </CardContent>
-      </Card>
-      
-      <Tabs defaultValue="assignments">
-        <div className="flex justify-between items-center">
-          <TabsList>
-            <TabsTrigger value="assignments">Case Assignments</TabsTrigger>
-            <TabsTrigger value="active_cases">Active Cases</TabsTrigger>
-          </TabsList>
-          <div className="flex items-center gap-2">
-            <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('list')}>
-              <List className="h-4 w-4" />
-            </Button>
-            <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('grid')}>
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Mediator Dashboard</h1>
+            <p className="text-gray-600 mt-1">Manage your assigned cases and sessions</p>
           </div>
         </div>
 
-        <TabsContent value="assignments">
-          {assignedCases.length === 0 ? (
-            <div className="text-center py-12">
-              <p>No new case assignments at this time.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
-              {assignedCases.map((caseData) => {
-                  const participants: any = {};
-                  if (caseData.claimant) participants[caseData.claimant.id] = caseData.claimant;
-                  if (caseData.respondent) participants[caseData.respondent.id] = caseData.respondent;
-                  if (profile) participants[profile.id] = profile;
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="cases" className="flex items-center space-x-2">
+              <Users className="h-4 w-4" />
+              <span>Assigned Cases</span>
+            </TabsTrigger>
+            <TabsTrigger value="sessions" className="flex items-center space-x-2">
+              <Calendar className="h-4 w-4" />
+              <span>Sessions</span>
+            </TabsTrigger>
+            <TabsTrigger value="documents" className="flex items-center space-x-2">
+              <FileText className="h-4 w-4" />
+              <span>Documents</span>
+            </TabsTrigger>
+            <TabsTrigger value="messages" className="flex items-center space-x-2">
+              <MessageSquare className="h-4 w-4" />
+              <span>Messages</span>
+            </TabsTrigger>
+          </TabsList>
 
-                  return (
-                    <div key={caseData.id} className="space-y-4">
-                      <AssignmentCard 
-                        assignment={transformCaseToAssignment(caseData)}
-                        onAccept={handleAcceptAssignment}
-                        onDecline={handleDeclineAssignment}
-                      />
-                      <CaseProgressTracker 
-                        caseItem={transformCaseToCaseItem(caseData)}
-                        onStatusUpdate={handleStatusUpdate}
-                      />
-                       {user && profile && (
-                        <MessagingPane 
-                          caseId={caseData.id} 
-                          userId={user.id} 
-                          participants={participants} 
-                        />
-                      )}
-                    </div>
-                  );
-              })}
+          <TabsContent value="cases" className="space-y-6">
+            <CasesOverview userRole="mediator" />
+          </TabsContent>
+
+          <TabsContent value="sessions" className="space-y-6">
+            <SessionsTab />
+          </TabsContent>
+
+          <TabsContent value="documents" className="space-y-6">
+            <DocumentsTab />
+          </TabsContent>
+
+          <TabsContent value="messages" className="space-y-6">
+            <div className="text-center py-12">
+              <MessageSquare className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Messages Coming Soon</h3>
+              <p className="text-gray-600">Direct messaging with case participants will be available soon.</p>
             </div>
-          )}
-        </TabsContent>
-        <TabsContent value="active_cases">
-          {assignedCases.length === 0 ? (
-             <div className="text-center py-12">
-               <p>No active cases.</p>
-             </div>
-          ) : (
-            <div className="space-y-6 mt-4">
-              {assignedCases.map((caseData) => (
-                <Card key={caseData.id}>
-                  <CardHeader>
-                    <CardTitle>{caseData.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <SessionManager caseId={caseData.id} />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 };
