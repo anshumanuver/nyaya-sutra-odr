@@ -21,7 +21,7 @@ const LoginForm = ({ onBack, onToggleMode, onForgotPassword }: LoginFormProps) =
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { signIn } = useAuth();
+  const { signIn, getRoleDashboardPath } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +41,9 @@ const LoginForm = ({ onBack, onToggleMode, onForgotPassword }: LoginFormProps) =
           title: "Login Successful",
           description: "Welcome back! Redirecting to dashboard...",
         });
-        // Role-based redirection will be handled by AuthPage
+        // Navigate to the appropriate dashboard based on user role
+        const dashboardPath = getRoleDashboardPath();
+        navigate(dashboardPath);
       }
     } catch (error) {
       toast({

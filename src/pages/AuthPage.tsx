@@ -11,11 +11,11 @@ type AuthMode = 'login' | 'register' | 'reset';
 const AuthPage = () => {
   const [mode, setMode] = useState<AuthMode>('login');
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, profile, getRoleDashboardPath } = useAuth();
 
   // Redirect if already authenticated based on role
   if (user && profile) {
-    const rolePath = getRoleDashboardPath(profile.role);
+    const rolePath = getRoleDashboardPath();
     navigate(rolePath);
     return null;
   }
@@ -43,15 +43,6 @@ const AuthPage = () => {
       return <RegisterForm onBack={handleBack} onToggleMode={toggleMode} />;
     default:
       return <LoginForm onBack={handleBack} onToggleMode={toggleMode} onForgotPassword={showResetForm} />;
-  }
-};
-
-const getRoleDashboardPath = (role: string): string => {
-  switch (role) {
-    case 'mediator': return '/dashboard/mediator';
-    case 'admin': return '/dashboard/admin';
-    case 'respondent': return '/dashboard/respondent';
-    default: return '/dashboard/claimant';
   }
 };
 
