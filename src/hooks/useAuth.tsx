@@ -75,15 +75,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (error) {
           console.error('❌ Error fetching profile:', error);
           setProfile(null);
+          setLoading(false);
         } else if (!userProfile) {
           console.warn('⚠️ No profile found for user:', user.id);
           setProfile(null);
+          setLoading(false);
         } else {
           console.log('✅ Profile fetched successfully:', userProfile);
           setProfile(userProfile as Profile);
+          setLoading(false);
         }
       })
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        console.error('❌ Unexpected error in profile fetch:', err);
+        setProfile(null);
+        setLoading(false);
+      });
   }, [user]);
 
   const signUp = async (email: string, password: string, userData: any) => {
