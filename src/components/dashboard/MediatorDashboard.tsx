@@ -1,13 +1,13 @@
-
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, FileText, MessageSquare, Users } from 'lucide-react';
+import { Calendar, FileText, MessageSquare, Users, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { getAssignedCasesForMediator } from '@/services/caseService';
 import CasesOverview from './CasesOverview';
 import SessionsTab from './SessionsTab';
 import DocumentsTab from './DocumentsTab';
+import { Card, CardContent } from '@/components/ui/card';
 
 const MediatorDashboard = () => {
   const { user } = useAuth();
@@ -15,7 +15,7 @@ const MediatorDashboard = () => {
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
 
   // Fetch assigned cases for the mediator
-  const { data: assignedCases = [], isLoading } = useQuery({
+  const { data: assignedCases = [], isLoading, error } = useQuery({
     queryKey: ['mediator-cases', user?.id],
     queryFn: () => getAssignedCasesForMediator(user!.id),
     enabled: !!user?.id,
@@ -33,6 +33,20 @@ const MediatorDashboard = () => {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p>Loading your assigned cases...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
+        <Card className="w-full max-w-lg">
+          <CardContent className="p-8 text-center">
+            <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Dashboard</h3>
+            <p className="text-gray-600">We couldn't load your assigned cases. Please try again later.</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -69,7 +83,13 @@ const MediatorDashboard = () => {
           </TabsList>
 
           <TabsContent value="cases" className="space-y-6">
-            <CasesOverview userRole="mediator" onSelectCase={handleSelectCase} />
+            <CasesOverview 
+              userRole="mediator" 
+              onSelectCase={handleSelectCase} 
+              cases={assignedCases}
+              isLoading={false}
+              error={null}
+            />
           </TabsContent>
 
           <TabsContent value="sessions" className="space-y-6">

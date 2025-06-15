@@ -1,4 +1,3 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,14 +13,17 @@ interface CasesOverviewProps {
   userRole: 'claimant' | 'respondent' | 'mediator' | 'admin';
   onSelectCase?: (caseId: string) => void;
   onAssignMediator?: (caseItem: any) => void;
+  cases?: any[];
+  isLoading?: boolean;
+  error?: Error | null;
 }
 
-const CasesOverview = ({ userRole, onSelectCase, onAssignMediator }: CasesOverviewProps) => {
+const CasesOverview = ({ userRole, onSelectCase, onAssignMediator, cases: casesProp, isLoading: isLoadingProp, error: errorProp }: CasesOverviewProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
 
-  const { data: cases = [], isLoading, error } = useQuery({
+  const { data: fetchedCases = [], isLoading: fetchedIsLoading, error: fetchedError } = useQuery({
     queryKey: ['cases', userRole, user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -54,8 +56,12 @@ const CasesOverview = ({ userRole, onSelectCase, onAssignMediator }: CasesOvervi
       if (error) throw error;
       return data || [];
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && casesProp === undefined,
   });
+
+  const cases = casesProp !== undefined ? casesProp : fetchedCases;
+  const isLoading = isLoadingProp !== undefined ? isLoadingProp : fetchedIsLoading;
+  const error = errorProp !== undefined ? errorProp : fetchedError;
 
   const handleViewDetails = (caseItem: any) => {
     setSelectedCaseId(caseItem.id);
