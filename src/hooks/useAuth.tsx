@@ -63,33 +63,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setProfile(null);
       return;
     }
+    
     setLoading(true);
     console.log('👤 Fetching profile for:', user.id);
-    supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .maybeSingle()
-      .then(({ data: userProfile, error }) => {
+    
+    const fetchProfile = async () => {
+      try {
+        const { data: userProfile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+
         if (error) {
           console.error('❌ Error fetching profile:', error);
           setProfile(null);
-          setLoading(false);
         } else if (!userProfile) {
           console.warn('⚠️ No profile found for user:', user.id);
           setProfile(null);
-          setLoading(false);
         } else {
           console.log('✅ Profile fetched successfully:', userProfile);
           setProfile(userProfile as Profile);
-          setLoading(false);
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error('❌ Unexpected error in profile fetch:', err);
         setProfile(null);
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    fetchProfile();
   }, [user]);
 
   const signUp = async (email: string, password: string, userData: any) => {
