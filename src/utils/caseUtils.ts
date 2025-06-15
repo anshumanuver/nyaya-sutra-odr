@@ -28,3 +28,11 @@ export const isValidCaseCode = (code: string): boolean => {
 export const formatCaseCode = (code: string): string => {
   return code.toUpperCase().trim();
 };
+
+/**
+ * Generates a shareable join link for a case
+ */
+export const generateJoinLink = (caseCode: string): string => {
+  const baseUrl = window.location.origin;
+  return `${baseUrl}/join-case?code=${encodeURIComponent(caseCode)}`;
+};

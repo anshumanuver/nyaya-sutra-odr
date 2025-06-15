@@ -1,6 +1,5 @@
-
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -13,9 +12,13 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { isValidCaseCode, formatCaseCode } from '@/utils/caseUtils';
 
 const joinCaseSchema = z.object({
-  case_code: z.string().min(8, 'Please enter a valid case code').max(12, 'Case code is too long'),
+  case_code: z.string()
+    .min(8, 'Please enter a valid case code')
+    .max(15, 'Case code is too long')
+    .refine((code) => isValidCaseCode(code), 'Invalid case code format'),
 });
 
 type JoinCaseValues = z.infer<typeof joinCaseSchema>;
@@ -35,6 +38,7 @@ const JoinCasePage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [isSearching, setIsSearching] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [caseDetails, setCaseDetails] = useState<CaseDetails | null>(null);
@@ -42,7 +46,23 @@ const JoinCasePage = () => {
 
   const form = useForm<JoinCaseValues>({
     resolver: zodResolver(joinCaseSchema),
+    defaultValues: {
+      case_code: '',
+    },
   });
+
+  // Check for case code in URL parameters
+  useEffect(() => {
+    const codeFromUrl = searchParams.get('code');
+    if (codeFromUrl) {
+      const formattedCode = formatCaseCode(codeFromUrl);
+      form.setValue('case_code', formattedCode);
+      // Auto-search if valid code
+      if (isValidCaseCode(formattedCode)) {
+        searchCase({ case_code: formattedCode });
+      }
+    }
+  }, [searchParams]);
 
   const searchCase = async (values: JoinCaseValues) => {
     if (!user) {
@@ -59,15 +79,29 @@ const JoinCasePage = () => {
     setCaseDetails(null);
 
     try {
+      const formattedCode = formatCaseCode(values.case_code);
+      
+      console.log('Searching for case with code:', formattedCode);
+
       const { data: caseData, error } = await supabase
         .from('cases')
         .select('id, case_number, title, case_type, amount_in_dispute, currency, created_at, claimant_id')
-        .eq('case_code', values.case_code.toUpperCase())
+        .eq('case_code', formattedCode)
         .eq('status', 'filed')
         .is('respondent_id', null)
         .single();
 
-      if (error || !caseData) {
+      if (error) {
+        console.error('Error searching for case:', error);
+        if (error.code === 'PGRST116') {
+          setSearchError('Case not found. Please check the case code and try again.');
+        } else {
+          setSearchError('Case not found or already has a respondent assigned.');
+        }
+        return;
+      }
+
+      if (!caseData) {
         setSearchError('Case not found or already has a respondent assigned.');
         return;
       }
@@ -77,10 +111,11 @@ const JoinCasePage = () => {
         return;
       }
 
+      console.log('Case found:', caseData);
       setCaseDetails(caseData);
     } catch (error: any) {
       console.error('Error searching for case:', error);
-      setSearchError('An error occurred while searching for the case.');
+      setSearchError('An error occurred while searching for the case. Please try again.');
     } finally {
       setIsSearching(false);
     }
@@ -92,6 +127,8 @@ const JoinCasePage = () => {
     setIsJoining(true);
 
     try {
+      console.log('Joining case:', caseDetails.id);
+
       const { error } = await supabase
         .from('cases')
         .update({ 
@@ -165,7 +202,7 @@ const JoinCasePage = () => {
               Find Case
             </CardTitle>
             <CardDescription>
-              Enter the 8-12 character case code you received from the claimant
+              Enter the case code you received from the claimant
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -181,8 +218,8 @@ const JoinCasePage = () => {
                         <Input 
                           placeholder="e.g., CASE2025A1B2" 
                           {...field}
-                          onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                          className="font-mono"
+                          onChange={(e) => field.onChange(formatCaseCode(e.target.value))}
+                          className="font-mono text-center text-lg"
                         />
                       </FormControl>
                       <FormMessage />

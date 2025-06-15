@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { ArrowLeft, FileText, Upload } from 'lucide-react';
+import { ArrowLeft, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -17,11 +17,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { generateCaseCode } from '@/utils/caseUtils';
 
 const caseSchema = z.object({
-  title: z.string().min(5, 'Title must be at least 5 characters'),
-  description: z.string().min(20, 'Description must be at least 20 characters'),
+  title: z.string().min(5, 'Title must be at least 5 characters').max(200, 'Title is too long'),
+  description: z.string().min(20, 'Description must be at least 20 characters').max(2000, 'Description is too long'),
   case_type: z.string().min(1, 'Please select a case type'),
   dispute_mode: z.string().min(1, 'Please select a dispute resolution mode'),
-  amount_in_dispute: z.number().min(1, 'Amount must be greater than 0').optional(),
+  amount_in_dispute: z.number().min(0, 'Amount cannot be negative').optional(),
   currency: z.string().optional(),
 });
 
@@ -54,11 +54,33 @@ const NewCasePage = () => {
 
     try {
       // Generate a unique case code
-      const caseCode = generateCaseCode();
+      let caseCode = generateCaseCode();
+      let attempts = 0;
+      const maxAttempts = 5;
+
+      // Ensure case code is unique
+      while (attempts < maxAttempts) {
+        const { data: existingCase } = await supabase
+          .from('cases')
+          .select('id')
+          .eq('case_code', caseCode)
+          .single();
+
+        if (!existingCase) {
+          break; // Code is unique
+        }
+
+        caseCode = generateCaseCode();
+        attempts++;
+      }
+
+      if (attempts >= maxAttempts) {
+        throw new Error('Unable to generate unique case code. Please try again.');
+      }
 
       const caseData = {
-        title: values.title,
-        description: values.description,
+        title: values.title.trim(),
+        description: values.description.trim(),
         case_type: values.case_type,
         dispute_mode: values.dispute_mode,
         amount_in_dispute: values.amount_in_dispute || null,
@@ -78,14 +100,15 @@ const NewCasePage = () => {
 
       if (error) {
         console.error('Error creating case:', error);
-        throw error;
+        throw new Error(error.message || 'Failed to create case');
       }
 
       console.log('Case created successfully:', data);
 
       toast({
         title: "Case Filed Successfully!",
-        description: `Your case has been filed with case number ${data.case_number}. Case code: ${caseCode}`,
+        description: `Your case has been filed with case number ${data.case_number}. Share case code "${caseCode}" with the respondent.`,
+        duration: 8000,
       });
 
       navigate('/dashboard/claimant');
@@ -138,7 +161,7 @@ const NewCasePage = () => {
                   name="title"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Case Title</FormLabel>
+                      <FormLabel>Case Title *</FormLabel>
                       <FormControl>
                         <Input 
                           placeholder="Brief description of your dispute" 
@@ -155,7 +178,7 @@ const NewCasePage = () => {
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Detailed Description</FormLabel>
+                      <FormLabel>Detailed Description *</FormLabel>
                       <FormControl>
                         <Textarea 
                           placeholder="Explain your dispute in detail, including relevant facts and circumstances"
@@ -174,7 +197,7 @@ const NewCasePage = () => {
                     name="case_type"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Case Type</FormLabel>
+                        <FormLabel>Case Type *</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -187,6 +210,7 @@ const NewCasePage = () => {
                             <SelectItem value="employment">Employment Dispute</SelectItem>
                             <SelectItem value="property">Property Dispute</SelectItem>
                             <SelectItem value="family">Family Dispute</SelectItem>
+                            <SelectItem value="contract">Contract Dispute</SelectItem>
                             <SelectItem value="other">Other</SelectItem>
                           </SelectContent>
                         </Select>
@@ -200,7 +224,7 @@ const NewCasePage = () => {
                     name="dispute_mode"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Preferred Resolution Method</FormLabel>
+                        <FormLabel>Preferred Resolution Method *</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -230,6 +254,8 @@ const NewCasePage = () => {
                           <Input 
                             type="number" 
                             placeholder="Enter amount"
+                            min="0"
+                            step="0.01"
                             {...field}
                             onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
                           />
