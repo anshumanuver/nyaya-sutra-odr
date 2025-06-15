@@ -1,20 +1,52 @@
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, MapPin, Video, ExternalLink } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Calendar, Clock, MapPin, Video, Edit, Trash2, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
-import { getAllUpcomingSessions } from '@/services/sessionService';
+import { getSessionsForCase, cancelSession } from '@/services/sessionService';
+import { useToast } from '@/hooks/use-toast';
 import { Database } from '@/integrations/supabase/types';
 
 type SessionRow = Database['public']['Tables']['case_sessions']['Row'];
 
-const SessionsTab = () => {
+interface SessionManagerProps {
+  caseId: string;
+}
+
+const SessionManager = ({ caseId }: SessionManagerProps) => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const { data: sessions = [], isLoading } = useQuery({
-    queryKey: ['sessions', 'upcoming'],
-    queryFn: getAllUpcomingSessions,
+    queryKey: ['case-sessions', caseId],
+    queryFn: () => getSessionsForCase(caseId),
   });
+
+  const cancelSessionMutation = useMutation({
+    mutationFn: cancelSession,
+    onSuccess: () => {
+      toast({
+        title: "Session Cancelled",
+        description: "The session has been cancelled successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['case-sessions', caseId] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to cancel session. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleCancelSession = (sessionId: string) => {
+    if (confirm('Are you sure you want to cancel this session?')) {
+      cancelSessionMutation.mutate(sessionId);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -44,20 +76,25 @@ const SessionsTab = () => {
       <CardHeader>
         <CardTitle className="flex items-center">
           <Calendar className="h-5 w-5 mr-2" />
-          Upcoming Sessions
+          Scheduled Sessions
         </CardTitle>
       </CardHeader>
       <CardContent>
         {sessions.length === 0 ? (
           <div className="text-center py-8">
             <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Scheduled Sessions</h3>
-            <p className="text-gray-600">Sessions will appear here once scheduled by mediators or arbitrators</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Sessions Scheduled</h3>
+            <p className="text-gray-600">Schedule your first session using the form above</p>
           </div>
         ) : (
           <div className="space-y-4">
             {sessions.map((session) => (
-              <SessionCard key={session.id} session={session} />
+              <SessionCard 
+                key={session.id} 
+                session={session} 
+                onCancel={handleCancelSession}
+                isLoading={cancelSessionMutation.isPending}
+              />
             ))}
           </div>
         )}
@@ -68,10 +105,14 @@ const SessionsTab = () => {
 
 interface SessionCardProps {
   session: SessionRow;
+  onCancel: (sessionId: string) => void;
+  isLoading: boolean;
 }
 
-const SessionCard = ({ session }: SessionCardProps) => {
+const SessionCard = ({ session, onCancel, isLoading }: SessionCardProps) => {
   const sessionDate = new Date(session.scheduled_at);
+  const isUpcoming = sessionDate > new Date();
+  const canCancel = session.status === 'scheduled' && isUpcoming;
 
   return (
     <div className="border rounded-lg p-4 space-y-3">
@@ -115,18 +156,34 @@ const SessionCard = ({ session }: SessionCardProps) => {
         </div>
       )}
 
-      {session.meeting_link && (
-        <div className="flex justify-end pt-2 border-t">
-          <Button variant="outline" size="sm" asChild>
-            <a href={session.meeting_link} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="h-4 w-4 mr-1" />
-              Join Meeting
-            </a>
-          </Button>
+      <div className="flex justify-between items-center pt-2 border-t">
+        <div className="flex space-x-2">
+          {session.meeting_link && (
+            <Button variant="outline" size="sm" asChild>
+              <a href={session.meeting_link} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-4 w-4 mr-1" />
+                Join Meeting
+              </a>
+            </Button>
+          )}
         </div>
-      )}
+        
+        <div className="flex space-x-2">
+          {canCancel && (
+            <Button 
+              variant="destructive" 
+              size="sm"
+              onClick={() => onCancel(session.id)}
+              disabled={isLoading}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Cancel
+            </Button>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
 
-export default SessionsTab;
+export default SessionManager;
