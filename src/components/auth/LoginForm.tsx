@@ -21,31 +21,40 @@ const LoginForm = ({ onBack, onToggleMode, onForgotPassword }: LoginFormProps) =
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { signIn, getRoleDashboardPath } = useAuth();
+  const { signIn, user, profile, getRoleDashboardPath } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('🔐 Login form submitted for:', email);
     setLoading(true);
     
     try {
       const { error } = await signIn(email, password);
       
       if (error) {
+        console.error('❌ Login failed:', error);
         toast({
           title: "Login Failed",
           description: error.message,
           variant: "destructive"
         });
       } else {
+        console.log('✅ Login successful, waiting for profile data...');
         toast({
           title: "Login Successful",
           description: "Welcome back! Redirecting to dashboard...",
         });
-        // Navigate to the appropriate dashboard based on user role
-        const dashboardPath = getRoleDashboardPath();
-        navigate(dashboardPath);
+        
+        // Give a moment for the auth state to update
+        setTimeout(() => {
+          console.log('⏰ Timeout reached, checking auth state:', { user: !!user, profile: !!profile });
+          const dashboardPath = getRoleDashboardPath();
+          console.log('🎯 Navigating to:', dashboardPath);
+          navigate(dashboardPath);
+        }, 1500);
       }
     } catch (error) {
+      console.error('❌ Login exception:', error);
       toast({
         title: "Login Failed",
         description: "An unexpected error occurred. Please try again.",
@@ -55,6 +64,15 @@ const LoginForm = ({ onBack, onToggleMode, onForgotPassword }: LoginFormProps) =
       setLoading(false);
     }
   };
+
+  // Debug current auth state
+  console.log('🔍 LoginForm state:', { 
+    userExists: !!user, 
+    profileExists: !!profile,
+    userEmail: user?.email,
+    profileRole: profile?.role,
+    loading 
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-teal-50 flex items-center justify-center p-4">

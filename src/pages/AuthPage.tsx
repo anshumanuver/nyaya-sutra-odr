@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import LoginForm from '@/components/auth/LoginForm';
@@ -11,28 +11,57 @@ type AuthMode = 'login' | 'register' | 'reset';
 const AuthPage = () => {
   const [mode, setMode] = useState<AuthMode>('login');
   const navigate = useNavigate();
-  const { user, profile, getRoleDashboardPath } = useAuth();
+  const { user, profile, getRoleDashboardPath, loading } = useAuth();
 
-  // Redirect if already authenticated based on role
-  if (user && profile) {
-    const rolePath = getRoleDashboardPath();
-    navigate(rolePath);
-    return null;
+  // Debug current auth state
+  console.log('🔍 AuthPage state:', { 
+    userExists: !!user, 
+    profileExists: !!profile,
+    userEmail: user?.email,
+    profileRole: profile?.role,
+    loading 
+  });
+
+  useEffect(() => {
+    // Only redirect if we have both user and profile data
+    if (user && profile && !loading) {
+      console.log('🎯 AuthPage: User authenticated, redirecting...');
+      const rolePath = getRoleDashboardPath();
+      console.log('🗺️ Redirecting to:', rolePath);
+      navigate(rolePath, { replace: true });
+    }
+  }, [user, profile, loading, navigate, getRoleDashboardPath]);
+
+  // Show loading while auth state is being determined
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-teal-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   const handleBack = () => {
+    console.log('🔙 Navigating back to home');
     navigate('/');
   };
 
   const toggleMode = () => {
-    setMode(mode === 'login' ? 'register' : 'login');
+    const newMode = mode === 'login' ? 'register' : 'login';
+    console.log('🔄 Toggling auth mode to:', newMode);
+    setMode(newMode);
   };
 
   const showResetForm = () => {
+    console.log('🔄 Showing reset form');
     setMode('reset');
   };
 
   const backToLogin = () => {
+    console.log('🔄 Back to login form');
     setMode('login');
   };
 
