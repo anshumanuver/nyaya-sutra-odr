@@ -13,9 +13,10 @@ import { useNavigate } from 'react-router-dom';
 interface CasesOverviewProps {
   userRole: 'claimant' | 'respondent' | 'mediator' | 'admin';
   onSelectCase?: (caseId: string) => void;
+  onAssignMediator?: (caseItem: any) => void;
 }
 
-const CasesOverview = ({ userRole, onSelectCase }: CasesOverviewProps) => {
+const CasesOverview = ({ userRole, onSelectCase, onAssignMediator }: CasesOverviewProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
@@ -122,10 +123,11 @@ const CasesOverview = ({ userRole, onSelectCase }: CasesOverviewProps) => {
         {cases.map((caseItem) => (
           <EnhancedCaseCard
             key={caseItem.id}
-            caseItem={caseItem}
-            userRole={userRole}
+            case_item={caseItem}
             onViewDetails={handleViewDetails}
             onViewDocuments={handleViewDocuments}
+            onAssignMediator={onAssignMediator}
+            showParticipants={userRole === 'admin'}
           />
         ))}
       </div>
