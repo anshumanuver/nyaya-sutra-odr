@@ -1,9 +1,12 @@
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Plus, Calendar, FileText, MessageSquare } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import ClaimantDashboardHeader from './ClaimantDashboardHeader';
 import ClaimantStats from './ClaimantStats';
 import CasesOverview from './CasesOverview';
@@ -12,13 +15,49 @@ import DocumentsTab from './DocumentsTab';
 
 const ClaimantDashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('cases');
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+
+  // Fetch cases for the current claimant
+  const { data: cases = [], isLoading } = useQuery({
+    queryKey: ['claimant-cases', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('cases')
+        .select('*')
+        .eq('claimant_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id,
+  });
+
+  const handleSelectCase = (caseId: string) => {
+    setSelectedCaseId(caseId);
+    setActiveTab('documents');
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p>Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         <ClaimantDashboardHeader />
-        <ClaimantStats />
+        <ClaimantStats cases={cases} />
 
         <div className="flex justify-between items-center mb-6">
           <div>
@@ -55,7 +94,7 @@ const ClaimantDashboard = () => {
           </TabsList>
 
           <TabsContent value="cases" className="space-y-6">
-            <CasesOverview userRole="claimant" />
+            <CasesOverview userRole="claimant" onSelectCase={handleSelectCase} />
           </TabsContent>
 
           <TabsContent value="sessions" className="space-y-6">
@@ -63,7 +102,11 @@ const ClaimantDashboard = () => {
           </TabsContent>
 
           <TabsContent value="documents" className="space-y-6">
-            <DocumentsTab />
+            <DocumentsTab 
+              cases={cases}
+              selectedCaseId={selectedCaseId}
+              onSelectCase={setSelectedCaseId}
+            />
           </TabsContent>
 
           <TabsContent value="messages" className="space-y-6">

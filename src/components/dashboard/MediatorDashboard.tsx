@@ -1,13 +1,41 @@
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, FileText, MessageSquare, Users } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { getAssignedCasesForMediator } from '@/services/caseService';
 import CasesOverview from './CasesOverview';
 import SessionsTab from './SessionsTab';
 import DocumentsTab from './DocumentsTab';
 
 const MediatorDashboard = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('cases');
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+
+  // Fetch assigned cases for the mediator
+  const { data: assignedCases = [], isLoading } = useQuery({
+    queryKey: ['mediator-cases', user?.id],
+    queryFn: () => getAssignedCasesForMediator(user!.id),
+    enabled: !!user?.id,
+  });
+
+  const handleSelectCase = (caseId: string) => {
+    setSelectedCaseId(caseId);
+    setActiveTab('documents');
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p>Loading your assigned cases...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -41,7 +69,7 @@ const MediatorDashboard = () => {
           </TabsList>
 
           <TabsContent value="cases" className="space-y-6">
-            <CasesOverview userRole="mediator" />
+            <CasesOverview userRole="mediator" onSelectCase={handleSelectCase} />
           </TabsContent>
 
           <TabsContent value="sessions" className="space-y-6">
@@ -49,7 +77,11 @@ const MediatorDashboard = () => {
           </TabsContent>
 
           <TabsContent value="documents" className="space-y-6">
-            <DocumentsTab />
+            <DocumentsTab 
+              cases={assignedCases}
+              selectedCaseId={selectedCaseId}
+              onSelectCase={setSelectedCaseId}
+            />
           </TabsContent>
 
           <TabsContent value="messages" className="space-y-6">
