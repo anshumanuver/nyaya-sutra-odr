@@ -14,7 +14,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   // Function to fetch profile data
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string): Promise<Profile | null> => {
     console.log('👤 Fetching profile for user:', userId);
     try {
       const { data: userProfile, error } = await supabase
@@ -39,32 +39,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Handle auth state changes
+  const handleAuthStateChange = async (session: Session | null) => {
+    console.log('🔐 Processing auth state change for:', session?.user?.email || 'no user');
+    
+    setSession(session);
+    setUser(session?.user ?? null);
+
+    // If user is logged in, fetch their profile
+    if (session?.user) {
+      const userProfile = await fetchProfile(session.user.id);
+      setProfile(userProfile);
+    } else {
+      setProfile(null);
+    }
+    
+    // Always set loading to false after processing
+    setLoading(false);
+  };
+
   // Auth state listener
   useEffect(() => {
     console.log('🔄 AuthProvider: Setting up auth state listener');
-    setLoading(true);
-
+    
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔐 Auth state changed:', event, session?.user?.email);
-        
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        // If user is logged in, fetch their profile
-        if (session?.user) {
-          const userProfile = await fetchProfile(session.user.id);
-          setProfile(userProfile);
-        } else {
-          setProfile(null);
-        }
-        
-        // Set loading to false only after profile is fetched (or user is null)
-        setLoading(false);
+        await handleAuthStateChange(session);
       }
     );
 
-    // Check for existing session and handle it
+    // Get initial session
     const initializeAuth = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -76,19 +82,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
 
         console.log('📋 Initial session check:', session?.user?.email || 'No session');
-        
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        // If user exists, fetch their profile
-        if (session?.user) {
-          const userProfile = await fetchProfile(session.user.id);
-          setProfile(userProfile);
-        } else {
-          setProfile(null);
-        }
-        
-        setLoading(false);
+        await handleAuthStateChange(session);
       } catch (err) {
         console.error('❌ Error initializing auth:', err);
         setLoading(false);
