@@ -13,77 +13,95 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Function to fetch profile data
+  const fetchProfile = async (userId: string) => {
+    console.log('👤 Fetching profile for user:', userId);
+    try {
+      const { data: userProfile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('❌ Error fetching profile:', error);
+        return null;
+      } else if (!userProfile) {
+        console.warn('⚠️ No profile found for user:', userId);
+        return null;
+      } else {
+        console.log('✅ Profile fetched successfully:', userProfile);
+        return userProfile as Profile;
+      }
+    } catch (err) {
+      console.error('❌ Unexpected error in profile fetch:', err);
+      return null;
+    }
+  };
+
   // Auth state listener
   useEffect(() => {
     console.log('🔄 AuthProvider: Setting up auth state listener');
     setLoading(true);
 
-    // Always sync session and user on auth state change (DO NOT fetch profile here!)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         console.log('🔐 Auth state changed:', event, session?.user?.email);
+        
         setSession(session);
         setUser(session?.user ?? null);
-        setLoading(false); // Update loading as soon as session/user is set
+
+        // If user is logged in, fetch their profile
+        if (session?.user) {
+          const userProfile = await fetchProfile(session.user.id);
+          setProfile(userProfile);
+        } else {
+          setProfile(null);
+        }
+        
+        // Set loading to false only after profile is fetched (or user is null)
+        setLoading(false);
       }
     );
 
-    // Check for existing session and update user/session immediately
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) {
-        console.error('❌ Error getting session:', error);
-      } else {
+    // Check for existing session and handle it
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('❌ Error getting session:', error);
+          setLoading(false);
+          return;
+        }
+
+        console.log('📋 Initial session check:', session?.user?.email || 'No session');
+        
         setSession(session);
         setUser(session?.user ?? null);
+
+        // If user exists, fetch their profile
+        if (session?.user) {
+          const userProfile = await fetchProfile(session.user.id);
+          setProfile(userProfile);
+        } else {
+          setProfile(null);
+        }
+        
         setLoading(false);
-        console.log('📋 Initial session check:', session?.user?.email || 'No session');
+      } catch (err) {
+        console.error('❌ Error initializing auth:', err);
+        setLoading(false);
       }
-    });
+    };
+
+    initializeAuth();
 
     return () => {
       console.log('🧹 Cleaning up auth subscription');
       subscription.unsubscribe();
     };
   }, []);
-
-  // Separate effect to fetch profile when user changes
-  useEffect(() => {
-    if (!user) {
-      setProfile(null);
-      return;
-    }
-    
-    setLoading(true);
-    console.log('👤 Fetching profile for:', user.id);
-    
-    const fetchProfile = async () => {
-      try {
-        const { data: userProfile, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        if (error) {
-          console.error('❌ Error fetching profile:', error);
-          setProfile(null);
-        } else if (!userProfile) {
-          console.warn('⚠️ No profile found for user:', user.id);
-          setProfile(null);
-        } else {
-          console.log('✅ Profile fetched successfully:', userProfile);
-          setProfile(userProfile as Profile);
-        }
-      } catch (err) {
-        console.error('❌ Unexpected error in profile fetch:', err);
-        setProfile(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProfile();
-  }, [user]);
 
   console.log('🔍 Auth Provider State:', {
     userEmail: user?.email,

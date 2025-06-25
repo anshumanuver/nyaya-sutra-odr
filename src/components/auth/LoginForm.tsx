@@ -1,6 +1,5 @@
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,9 +18,8 @@ const LoginForm = ({ onBack, onToggleMode, onForgotPassword }: LoginFormProps) =
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
   const { toast } = useToast();
-  const { signIn, user, profile, getRoleDashboardPath } = useAuth();
+  const { signIn } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,19 +37,12 @@ const LoginForm = ({ onBack, onToggleMode, onForgotPassword }: LoginFormProps) =
           variant: "destructive"
         });
       } else {
-        console.log('✅ Login successful, waiting for profile data...');
+        console.log('✅ Login successful, AuthProvider will handle redirect');
         toast({
           title: "Login Successful",
-          description: "Welcome back! Redirecting to dashboard...",
+          description: "Welcome back! Redirecting to your dashboard...",
         });
-        
-        // Give a moment for the auth state to update
-        setTimeout(() => {
-          console.log('⏰ Timeout reached, checking auth state:', { user: !!user, profile: !!profile });
-          const dashboardPath = getRoleDashboardPath();
-          console.log('🎯 Navigating to:', dashboardPath);
-          navigate(dashboardPath);
-        }, 1500);
+        // Remove the setTimeout logic - let AuthProvider handle the redirect
       }
     } catch (error) {
       console.error('❌ Login exception:', error);
@@ -64,15 +55,6 @@ const LoginForm = ({ onBack, onToggleMode, onForgotPassword }: LoginFormProps) =
       setLoading(false);
     }
   };
-
-  // Debug current auth state
-  console.log('🔍 LoginForm state:', { 
-    userExists: !!user, 
-    profileExists: !!profile,
-    userEmail: user?.email,
-    profileRole: profile?.role,
-    loading 
-  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-teal-50 flex items-center justify-center p-4">

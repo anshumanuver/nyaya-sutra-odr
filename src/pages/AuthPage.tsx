@@ -23,12 +23,15 @@ const AuthPage = () => {
   });
 
   useEffect(() => {
-    // Only redirect if we have both user and profile data
+    // Only redirect if we have both user and profile data AND loading is complete
     if (user && profile && !loading) {
-      console.log('🎯 AuthPage: User authenticated, redirecting...');
+      console.log('🎯 AuthPage: User authenticated with profile, redirecting...');
       const rolePath = getRoleDashboardPath();
       console.log('🗺️ Redirecting to:', rolePath);
       navigate(rolePath, { replace: true });
+    } else if (user && !profile && !loading) {
+      // User exists but no profile found - this shouldn't happen normally
+      console.warn('⚠️ User exists but no profile found');
     }
   }, [user, profile, loading, navigate, getRoleDashboardPath]);
 
@@ -38,7 +41,7 @@ const AuthPage = () => {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-teal-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p>Loading...</p>
+          <p className="text-gray-600">Loading your profile...</p>
         </div>
       </div>
     );
