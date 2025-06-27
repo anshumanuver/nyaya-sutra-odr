@@ -39,59 +39,79 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Handle auth state changes
-  const handleAuthStateChange = async (session: Session | null) => {
-    console.log('🔐 Processing auth state change for:', session?.user?.email || 'no user');
-    
-    setSession(session);
-    setUser(session?.user ?? null);
-
-    // If user is logged in, fetch their profile
-    if (session?.user) {
-      const userProfile = await fetchProfile(session.user.id);
-      setProfile(userProfile);
-    } else {
-      setProfile(null);
-    }
-    
-    // Always set loading to false after processing
-    setLoading(false);
-  };
-
   // Auth state listener
   useEffect(() => {
     console.log('🔄 AuthProvider: Setting up auth state listener');
+    let mounted = true;
     
-    // Set up auth state listener
+    // Set up auth state listener for ongoing changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔐 Auth state changed:', event, session?.user?.email);
-        await handleAuthStateChange(session);
+        
+        if (!mounted) return;
+
+        // Handle auth state changes (but not initial load)
+        if (event !== 'INITIAL_SESSION') {
+          setSession(session);
+          setUser(session?.user ?? null);
+
+          if (session?.user) {
+            const userProfile = await fetchProfile(session.user.id);
+            if (mounted) {
+              setProfile(userProfile);
+            }
+          } else {
+            if (mounted) {
+              setProfile(null);
+            }
+          }
+        }
       }
     );
 
-    // Get initial session
+    // Get initial session separately
     const initializeAuth = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('❌ Error getting session:', error);
-          setLoading(false);
+          if (mounted) {
+            setLoading(false);
+          }
           return;
         }
 
         console.log('📋 Initial session check:', session?.user?.email || 'No session');
-        await handleAuthStateChange(session);
+        
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+
+          if (session?.user) {
+            const userProfile = await fetchProfile(session.user.id);
+            if (mounted) {
+              setProfile(userProfile);
+              setLoading(false);
+            }
+          } else {
+            setProfile(null);
+            setLoading(false);
+          }
+        }
       } catch (err) {
         console.error('❌ Error initializing auth:', err);
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
     initializeAuth();
 
     return () => {
+      mounted = false;
       console.log('🧹 Cleaning up auth subscription');
       subscription.unsubscribe();
     };
